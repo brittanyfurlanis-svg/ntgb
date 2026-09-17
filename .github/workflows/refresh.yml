@@ -10,6 +10,8 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 concurrency:
   group: refresh
@@ -18,6 +20,8 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.commit.outputs.changed }}
     steps:
       - uses: actions/checkout@v4
 
@@ -29,13 +33,39 @@ jobs:
         run: python scripts/fetch_gbb.py
 
       - name: Commit updated data
+        id: commit
         run: |
           git config user.name "ntgb-bot"
           git config user.email "ntgb-bot@users.noreply.github.com"
           git add site/data data/history data/raw
           if git diff --cached --quiet; then
             echo "No data change"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             git commit -m "data: AEMO refresh $(date -u +'%Y-%m-%d %H:%M UTC')"
             git push
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
+
+  # A push made with the workflow's own token does not trigger other workflows,
+  # so the site is republished here rather than by pages.yml.
+  publish:
+    needs: refresh
+    if: needs.refresh.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pages
+      cancel-in-progress: true
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4
