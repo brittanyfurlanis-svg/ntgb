@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="NT Gas Board — daily gas flows across the Northern Territory: production, demand and pipeline transfers for NT facilities reporting to AEMO.">
+<title>NTGB · NT Gas Flows</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --ground:#EEF1F4; --panel:#FFFFFF; --panel-2:#F6F8FA; --ink:#16202A; --muted:#5D6C7B; --rule:#D3DBE2; --rule-strong:#B9C4CE;
+  --flow:#1A73E8; --flow-soft:#1A73E81f; --agp:#D93025; --agp-soft:#D930251f; --lng:#1A73E8; --lng-soft:#1A73E81f; --missing:#5D6C7B; --missing-soft:#5D6C7B18;
+  --trunk:#D93025; --focus:#1A73E8;
+  --display:"Barlow Condensed","Arial Narrow",Arial,sans-serif; --body:"IBM Plex Sans","Helvetica Neue",Arial,sans-serif; --mono:"IBM Plex Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --ground:#0F151B; --panel:#182028; --panel-2:#1F2A34; --ink:#E6ECF1; --muted:#93A3B1; --rule:#2A3642; --rule-strong:#3B4A58;
+  --flow:#4A8FE7; --flow-soft:#4A8FE729; --agp:#E4574A; --agp-soft:#E4574A29; --lng:#4A8FE7; --lng-soft:#4A8FE729; --missing:#93A3B1; --missing-soft:#93A3B122; --trunk:#E4574A; --focus:#4A8FE7;
+}}
+:root[data-theme="dark"]{
+  --ground:#0F151B; --panel:#182028; --panel-2:#1F2A34; --ink:#E6ECF1; --muted:#93A3B1; --rule:#2A3642; --rule-strong:#3B4A58;
+  --flow:#4A8FE7; --flow-soft:#4A8FE729; --agp:#E4574A; --agp-soft:#E4574A29; --lng:#4A8FE7; --lng-soft:#4A8FE729; --missing:#93A3B1; --missing-soft:#93A3B122; --trunk:#E4574A; --focus:#4A8FE7;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1360px;margin:0 auto;padding:0 20px 40px}
+header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;padding:22px 0 14px;border-bottom:1px solid var(--rule);flex-wrap:wrap}
+.brand h1{font-family:var(--display);font-weight:700;font-size:34px;letter-spacing:.01em;margin:0;line-height:1;text-wrap:balance}
+.brand .sub{color:var(--muted);margin-top:6px;font-size:13px}
+.eyebrow{font-family:var(--display);font-weight:600;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.actions{display:flex;gap:10px;align-items:center}
+.btn{font:500 13px var(--body);border:1px solid var(--rule-strong);background:var(--panel);color:var(--ink);padding:8px 12px;border-radius:4px;cursor:pointer}
+.btn.primary{background:var(--ink);color:var(--ground);border-color:var(--ink)}
+.btn:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.datebar{display:flex;align-items:center;gap:14px;padding:14px 0;flex-wrap:wrap}
+.datebar .day{font-family:var(--display);font-weight:600;font-size:26px;line-height:1;min-width:230px;font-variant-numeric:tabular-nums}
+.datebar .day small{display:block;font:500 12px var(--body);color:var(--muted);letter-spacing:.04em;text-transform:uppercase;margin-top:4px}
+.datebar input[type=range]{flex:1;min-width:220px;accent-color:var(--flow)}
+.chip{display:inline-flex;align-items:center;gap:6px;font:500 12px var(--body);padding:3px 8px;border-radius:3px;border:1px solid var(--rule)}
+.chip.actual{color:var(--flow);border-color:var(--flow);background:var(--flow-soft)}
+.chip.forecast{color:var(--muted);border-style:dashed}
+.chip.missing{color:var(--missing);border-color:var(--missing);background:var(--missing-soft)}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--rule);border:1px solid var(--rule);margin-bottom:16px}
+.kpi{background:var(--panel);padding:14px 16px}
+.kpi .v{font-family:var(--display);font-weight:600;font-size:34px;line-height:1;font-variant-numeric:tabular-nums;margin-top:6px}
+.kpi .v span{font-size:15px;color:var(--muted);margin-left:4px;font-weight:500}
+.kpi .d{color:var(--muted);font-size:12px;margin-top:6px}
+.kpi.lng .v{color:var(--ink)}
+.kpi.status .v.bad{color:var(--missing)}
+.grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(320px,1fr);gap:16px;align-items:start}
+.map{background:var(--panel);border:1px solid var(--rule);padding:10px 10px 6px;overflow-x:auto}
+.map svg{display:block;width:100%;height:auto;max-width:100%}
+.legend{display:flex;gap:16px;flex-wrap:wrap;padding:10px 6px 6px;color:var(--muted);font-size:12px;align-items:center}
+.legend i{display:inline-block;width:22px;height:0;border-top:3px solid var(--flow);vertical-align:middle;margin-right:6px}
+.legend i.lng{border-color:var(--lng)}
+.legend i.agpl{border-color:var(--agp)}
+.legend i.fc{opacity:.55}
+.legend i.trunk{border-color:var(--trunk);border-top-width:5px}
+.legend i.ctx{border-color:var(--flow);border-top-style:dashed;border-top-width:3px}
+.legend i.onbb{border-color:var(--flow);opacity:.7;border-top-width:2px}
+.legend b{display:inline-block;width:10px;height:10px;border:1.5px solid var(--ink);vertical-align:middle;margin-right:6px;background:var(--panel)}
+.legend b.prod{width:0;height:0;border:none;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:11px solid var(--ink);background:none}
+.legend b.ps{border-radius:0}
+.legend b.junc{border-radius:50%;width:8px;height:8px}
+.legend b.miss{background:repeating-linear-gradient(45deg,var(--missing) 0 2px,transparent 2px 5px);border-color:var(--missing)}
+.side{display:flex;flex-direction:column;gap:16px}
+.card{background:var(--panel);border:1px solid var(--rule);padding:16px}
+.card h2{font-family:var(--display);font-weight:600;font-size:22px;margin:0 0 2px;line-height:1.1}
+.card .meta{color:var(--muted);font-size:12px;font-family:var(--mono)}
+.vals{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--rule);border:1px solid var(--rule);margin:12px 0 10px}
+.vals div{background:var(--panel-2);padding:8px 10px}
+.vals .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.vals .n{font-family:var(--display);font-weight:600;font-size:22px;font-variant-numeric:tabular-nums;line-height:1.1;margin-top:2px}
+.vals .n.zero{color:var(--muted)}
+.spark{margin-top:6px}
+.spark svg{width:100%;height:auto;display:block}
+.spark .cap{font-size:12px;color:var(--muted);margin-top:4px}
+.status ul{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.status li{display:flex;justify-content:space-between;gap:8px;font-size:13px;padding:6px 8px;border-left:3px solid var(--rule);background:var(--panel-2)}
+.status li.missing{border-left-color:var(--missing)}
+.status li.pending{border-left-color:var(--rule-strong)}
+.status li .who{font-weight:500}
+.status li .why{color:var(--muted);font-family:var(--mono);font-size:12px}
+.status p{margin:8px 0 0;color:var(--muted);font-size:12px}
+.private{border-style:dashed}
+.private p{margin:6px 0 0;color:var(--muted)}
+.private ul{margin:8px 0 0;padding-left:18px;color:var(--muted)}
+footer{margin-top:22px;padding-top:12px;border-top:1px solid var(--rule);color:var(--muted);font-size:12px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+/* svg */
+.node{cursor:pointer}
+.node .shape{fill:var(--panel);stroke:var(--ink);stroke-width:1.6}
+.node.prod .shape{fill:var(--flow-soft)}
+.node.lng .shape{fill:var(--lng-soft)}
+.node.junction .shape{fill:var(--ink)}
+.node.external .shape{stroke-dasharray:3 3}
+.node.missing .shape{stroke:var(--missing);fill:url(#hatch)}
+.node.pending .shape{stroke:var(--rule-strong);fill:var(--panel-2)}
+.node.context .shape{stroke:var(--muted);stroke-dasharray:3 3;fill:var(--panel-2)}
+.node.plant .shape{fill:var(--panel-2)}
+.node.context text.name{fill:var(--muted)}
+.edge.ctx{stroke:var(--flow);stroke-width:4;stroke-dasharray:6 6;opacity:1}
+.edge.ctx.onbb{stroke-dasharray:none;stroke-width:4;stroke:var(--flow);opacity:1}
+.node.selected .shape{stroke-width:3;stroke:var(--flow)}
+.node text{font-family:var(--body);font-size:12.5px;fill:var(--ink);pointer-events:none}
+.node text.val{font-family:var(--mono);font-size:11.5px;fill:var(--muted)}
+.node.missing text.val{fill:var(--missing)}
+.edge{fill:none;stroke:var(--flow);stroke-linecap:round;stroke-linejoin:round;cursor:pointer}
+.edge.lng{stroke:var(--lng)}
+.edge.trunk{stroke:var(--agp);cursor:default}
+.edge.agp{stroke:var(--agp)}
+
+.ah.agp{fill:var(--agp)}
+.edge.fc{}
+
+.insetbox{fill:var(--panel-2);stroke:var(--rule-strong)}
+.scalebar{stroke:var(--muted);stroke-width:1.5}
+.elabel.agpt{fill:var(--agp)}
+.edge-hit{fill:none;stroke:transparent;stroke-width:18;cursor:pointer}
+.elabel{font-family:var(--display);font-weight:600;font-size:13px;letter-spacing:.06em;fill:var(--muted);text-transform:uppercase;pointer-events:none}
+.eval{font-family:var(--mono);font-size:11.5px;fill:var(--ink);cursor:pointer}
+.eval:hover,.node text.val:hover{text-decoration:underline}
+.node text.val{pointer-events:auto;cursor:pointer}
+.hist{margin-top:10px;max-height:220px;overflow:auto;border:1px solid var(--rule);font-family:var(--mono);font-size:11.5px}
+.hist table{border-collapse:collapse;width:100%}
+.hist td{padding:3px 8px;border-bottom:1px solid var(--rule)}
+.hist td.n{text-align:right;font-variant-numeric:tabular-nums}
+.hist tr.fc td{font-style:italic;color:var(--muted)}
+.hist tr.sel td{background:var(--flow-soft)}
+.hist tr.miss td.n{color:var(--missing)}
+.edge.fc+.eval,.eval.fc{font-style:italic;fill:var(--muted)}
+
+.region{font-family:var(--display);font-weight:600;font-size:12px;letter-spacing:.14em;fill:var(--muted);text-transform:uppercase}
+.regionline{stroke:var(--rule);stroke-dasharray:2 4}
+#hatch line{stroke:var(--missing);stroke-width:1.2}
+.ah{fill:var(--flow)}.ah.lng{fill:var(--lng)}.ah.ctx{fill:var(--flow)}
+@media (max-width:980px){.grid{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,1fr)}}
+@media (prefers-reduced-motion:no-preference){.edge,.node .shape{transition:stroke-width .25s ease,opacity .25s ease}}
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+<header class="top">
+  <div class="brand">
+    <div class="eyebrow">NTGB · NT Gas Board</div>
+    <h1>NT Gas Flows</h1>
+    <div class="sub">Daily supply, demand and pipeline transfers for NT facilities reporting to AEMO. Public data, TJ per gas day.</div>
+  </div>
+  <div class="actions">
+    <button class="btn" id="latest" type="button">Latest actual</button>
+  </div>
+</header>
+
+<div class="datebar">
+  <div class="day"><span id="dayLabel">—</span><small id="daySub">gas day</small></div>
+  <input type="range" id="slider" min="0" max="0" value="0" aria-label="Gas day">
+  <span class="chip" id="dayChip">—</span>
+</div>
+
+<section class="kpis" aria-label="Territory totals for the selected gas day">
+  <div class="kpi"><div class="eyebrow">NT production</div><div class="v"><span id="kProd">—</span></div><div class="d">Blacktip (Yelcherr) + Mereenie + Palm Valley + SPCF</div></div>
+  <div class="kpi"><div class="eyebrow">NT demand</div><div class="v"><span id="kDem">—</span></div><div class="d">Power stations, McArthur River, Tanami</div></div>
+  <div class="kpi status"><div class="eyebrow">Facilities reported</div><div class="v" id="kStatV"><span id="kStat">—</span></div><div class="d" id="kStatD">of facilities expected to report</div></div>
+</section>
+
+<div class="grid">
+  <div class="map">
+    <svg id="schematic" viewBox="0 20 1000 1160" role="img" aria-label="Schematic of the Northern Territory gas network: producers, pipelines and demand points with the selected day's flows">
+      <defs>
+        <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6"/></pattern>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker><marker id="arrow-ctx" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0,0 L10,5 L0,10 z" class="ah ctx"/></marker><marker id="arrow-agp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0,0 L10,5 L0,10 z" class="ah agp"/></marker><marker id="arrow-lng" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0,0 L10,5 L0,10 z" class="ah lng"/></marker>
+      </defs>
+      <g id="regions"></g>
+      <g id="edges"></g>
+      <g id="nodes"></g>
+    </svg>
+    <div class="legend">
+      <span><i class="agpl"></i>Amadeus Gas Pipeline</span>
+      <span><i></i>Other pipelines and laterals</span>
+      <span>Flow is the number beside each line, TJ per gas day · <em>italic = forecast</em></span>
+      <span><b class="prod"></b>Producer</span>
+      <span><b class="ps"></b>Power station / mine</span>
+      <span><b class="junc"></b>Junction</span>
+      <span><b class="miss"></b>No data reported</span>
+      
+    </div>
+  </div>
+
+  <aside class="side">
+    <div class="card" id="detail">
+      <div class="eyebrow" id="dKind">Select a facility or pipeline</div>
+      <h2 id="dName">Amadeus Gas Pipeline</h2>
+      <div class="meta" id="dMeta"></div>
+      <div class="vals" id="dVals"></div>
+      <div class="spark" id="dSpark"></div>
+    </div>
+    <div class="card status" id="statusCard">
+      <div class="eyebrow">Reporting status</div>
+      <h2 id="sTitle">—</h2>
+      <ul id="sList"></ul>
+      <p id="sNote"></p>
+    </div>
+  </aside>
+</div>
+
+<footer>
+  <span>Source: AEMO Gas Board (GBB) — Actual Flow &amp; Storage (last 31 days) and Nominations &amp; Forecasts (next 7 days), © AEMO, reproduced with acknowledgement. Last AEMO update <span id="lastUpd" style="font-family:var(--mono)"></span>; refreshed daily. NTGB is independent and not affiliated with AEMO or the Northern Territory Government.</span>
+  <span>Facility IDs are AEMO's. Main map positioned by approximate site coordinates (1° latitude ≈ 111 km); Darwin enlarged; short laterals drawn longer than life so they can be read.</span>
+</footer>
+</div>
+
+<script>
+(async function(){
+let DATA;
+try{const resp=await fetch('data/latest.json?v='+Date.now(),{cache:'no-store'}); if(!resp.ok) throw new Error(resp.status); DATA=await resp.json();}
+catch(err){document.getElementById('dayLabel').textContent='Data unavailable'; document.getElementById('daySub').textContent='could not load data/latest.json — '+err; return;}
+const ACT=DATA.actual, FC=DATA.forecast;
+const dates=[...new Set([...Object.keys(ACT),...Object.keys(FC)])].sort();
+let lastActual=null; // set after FAC is defined: latest gas day with >=75% of expected facilities reporting
+
+// ---- Facility register (public view) ----
+// key = FacilityId-LocationId as AEMO publishes it. start = first gas day the facility is expected to report.
+const FAC={
+ '580010-580001':{name:'Amadeus Gas Pipeline — Darwin zone',id:580010,type:'PIPE',op:'APA'},
+ '580010-590017':{name:'Amadeus Gas Pipeline — Regional NT',id:580010,type:'PIPE',op:'APA'},
+ '580020-590017':{name:'Bonaparte Gas Pipeline',id:580020,type:'PIPE',op:'APA'},
+ '580030-580001':{name:'Wickham Point Pipeline',id:580030,type:'PIPE',op:'APA'},
+ '580040-590017':{name:'Mereenie',id:580040,type:'PROD',op:'Central Petroleum'},
+ '580050-590017':{name:'Northern Gas Pipeline — NT side',id:580050,type:'PIPE',op:'Jemena'},
+ '580050-590001':{name:'Northern Gas Pipeline — Mount Isa',id:580050,type:'PIPE',op:'Jemena'},
+ '580060-590017':{name:'Palm Valley',id:580060,type:'PROD',op:'Central Petroleum'},
+ '580070-590017':{name:'Palm Valley to Alice Springs Pipeline (PVASP)',id:580070,type:'PIPE',op:''},
+ '580100-590017':{name:'McArthur River Pipeline',id:580100,type:'PIPE',op:''},
+ '580180-590017':{name:'Blacktip (Yelcherr)',id:580180,type:'PROD',op:''},
+ '580210-590017':{name:'Tanami Gas Pipeline (TGP)',id:580210,type:'PIPE',op:'AGIG'},
+ '580220-590017':{name:'McArthur River Mine',id:580220,type:'BBGPG',op:'Glencore'},
+ '580231-580001':{name:'Channel Island Power Station',id:580231,type:'BBGPG',op:'Territory Generation'},
+ '580232-580001':{name:'Weddell Power Station',id:580232,type:'BBGPG',op:'Territory Generation'},
+ '580233-590017':{name:'Katherine Power Station',id:580233,type:'BBGPG',op:'Territory Generation'},
+ '580234-590017':{name:'Ron Goodin Power Station',id:580234,type:'BBGPG',op:'Territory Generation'},
+ '580235-590017':{name:'Owen Springs Power Station',id:580235,type:'BBGPG',op:'Territory Generation'},
+ '580236-590017':{name:'Sturt Plateau Compression Facility',id:580236,type:'PROD',op:'Tamboran',start:'2026-09-01'},
+ '580237-590017':{name:'Sturt Plateau Pipeline',id:580237,type:'PIPE',op:'',start:'2026-09-01'},
+};
+const D=0,S=1,TI=2,TO=3;
+{const days=Object.keys(ACT).sort(); for(const d of days){const exp=Object.keys(FAC).filter(k=>!FAC[k].start||d>=FAC[k].start); const got=exp.filter(k=>ACT[d][k]).length; if(got>=exp.length*0.75) lastActual=d;} if(!lastActual) lastActual=days[days.length-1];}
+
+// ---- Schematic nodes ---- (x,y in viewBox units; north at top, east to the right)
+// ---- Geography ---- main map positions come from latitude/longitude (approximate site coordinates); Darwin is an enlarged inset.
+const LON0=129.3, LAT0=12.3, PXLON=85.5, PXLAT=90;   // 1° latitude = 90 px ≈ 111 km  →  ≈1.23 km per px
+const proj=(lat,lon)=>[Math.round(60+(lon-LON0)*PXLON), Math.round(60+(Math.abs(lat)-LAT0)*PXLAT)];
+const INSET={x:600,y:30,w:380,h:250};
+const NODES=[
+ // main map — lat/lon
+ {id:'darwin', kind:'junction', ll:[-12.49,130.95], label:'Darwin',sub:'see enlargement →',key:'580010-580001',anchor:'start',lx:14,ly:-2},
+ {id:'bbs',    kind:'junction', ll:[-13.44,131.20], label:'Ban Ban Springs',key:'580010-590017',anchor:'start',lx:14,ly:-2},
+ {id:'yel',    kind:'prod',     ll:[-14.24,129.55], label:'Yelcherr GP',key:'580180-590017',metric:S,mlabel:'production',anchor:'start',lx:-20,ly:26},
+ {id:'katj',   kind:'junction', ll:[-14.47,132.22], label:'Katherine',key:'580010-590017',anchor:'end',lx:-14,ly:-4},
+ {id:'kat',    kind:'ps',       xy:[326,270], label:'Katherine PS',key:'580233-590017',metric:D,mlabel:'demand',anchor:'start',lx:14,ly:4},
+ {id:'dw',     kind:'junction', ll:[-16.25,133.37], label:'Daly Waters',key:'580010-590017',anchor:'end',lx:-14,ly:-4},
+ {id:'mrm',    kind:'ps',       ll:[-16.44,136.09], label:'McArthur River Mine',key:'580220-590017',metric:D,mlabel:'demand',anchor:'start',lx:16,ly:-2},
+ {id:'sppj',   kind:'junction', xy:[411,440], label:'',key:'580010-590017'},
+ {id:'spcf',   kind:'prod',     ll:[-16.45,133.72], label:'Sturt Plateau (SPCF)',key:'580236-590017',metric:S,mlabel:'production',anchor:'start',lx:14,ly:30},
+ {id:'ell',    kind:'junction', ll:[-17.55,133.54], label:'',key:'580010-590017'},
+ {id:'pc',     kind:'junction', ll:[-19.40,134.10], label:'Phillip Creek',sub:'Tennant Creek',key:'580010-590017',anchor:'end',lx:-14,ly:-4},
+ {id:'nru',    kind:'plant',    xy:[492,704], label:'NRU',key:null,anchor:'middle',lx:0,ly:-16,note:'Nitrogen Removal Unit at the Phillip Creek end of the Northern Gas Pipeline.'},
+ {id:'mtisa',  kind:'external', ll:[-20.73,139.49], label:'Mount Isa',sub:'Queensland',key:'580050-590001',metric:D,mlabel:'',anchor:'middle',lx:0,ly:-44},
+ {id:'tanj',   kind:'junction', ll:[-22.45,133.35], label:'',key:'580010-590017'},
+ {id:'tanami', kind:'ps',       ll:[-20.55,130.36], label:'Tanami Gold Mine',key:'580210-590017',metric:D,mlabel:'demand',anchor:'middle',lx:0,ly:-30},
+ {id:'w1',     kind:'junction', ll:[-21.30,133.60], label:'',key:'580010-590017',hidden:true},
+ {id:'w2',     kind:'junction', ll:[-23.30,133.35], label:'',key:'580010-590017',hidden:true},
+ {id:'alice',  kind:'junction', ll:[-23.70,133.88], label:'Alice Springs',key:'580070-590017',metric:D,mlabel:'demand',anchor:'start',lx:14,ly:-8},
+ {id:'asj',    kind:'junction', xy:[430,1093], label:'',key:'580070-590017'},
+ {id:'owen',   kind:'ps',       xy:[455,1135], label:'Owen Springs PS',key:'580235-590017',metric:D,mlabel:'demand',anchor:'start',lx:14,ly:4},
+ {id:'ron',    kind:'ps',       xy:[494,1106], label:'Ron Goodin PS',key:'580234-590017',metric:D,mlabel:'demand',anchor:'start',lx:14,ly:4},
+ {id:'agp0',   kind:'junction', xy:[351,1103], label:'',key:'580010-590017'},
+ {id:'pvic_a', kind:'junction', xy:[372,1081], label:'',key:'580010-590017'},
+ {id:'pvic_b', kind:'junction', xy:[430,1093], label:'',key:'580070-590017'},
+ {id:'mer',    kind:'prod',     ll:[-23.97,131.55], label:'Mereenie',key:'580040-590017',metric:S,mlabel:'production',anchor:'end',lx:-16,ly:-2},
+ {id:'pv',     kind:'prod',     ll:[-24.05,132.70], label:'Palm Valley',key:'580060-590017',metric:S,mlabel:'production',anchor:'middle',lx:0,ly:30},
+ // Darwin inset — box coordinates (not to scale)
+ {id:'ci',     kind:'ps',       xy:[640,150], label:'Channel Island PS',key:'580231-580001',metric:D,mlabel:'demand',anchor:'middle',lx:0,ly:30,inset:true},
+ {id:'dcg',    kind:'junction', xy:[770,150], label:'Darwin City Gate',key:'580010-580001',anchor:'end',lx:-4,ly:-12,inset:true},
+ {id:'ddn',    kind:'context',  xy:[770,225], label:'Darwin Distribution Network',key:null,anchor:'middle',lx:0,ly:22,inset:true,note:'The Darwin gas distribution network, fed from Darwin City Gate. AEMO reports the delivery to it as connection point 1808005 (Darwin City Gate to DDS); network customers are part of the client layer.'},
+ {id:'weddell',kind:'ps',       xy:[870,190], label:'Weddell PS',key:'580232-580001',metric:D,mlabel:'demand',anchor:'start',lx:14,ly:4,inset:true},
+ {id:'wppend', kind:'junction', xy:[950,110], label:'',key:'580030-580001',inset:true},
+];
+NODES.forEach(n=>{ if(n.ll){[n.x,n.y]=proj(n.ll[0],n.ll[1]);} else {[n.x,n.y]=n.xy;} });
+const P=id=>{const n=NODES.find(n=>n.id===id);return [n.x,n.y];};
+// ---- Edges ---- value(day) → TJ/d flowing along the edge in the drawn direction; null = unknown; cls 'ctx' = drawn for context only
+const EDGES=[
+ {id:'agp',label:'Amadeus Gas Pipeline',cls:'trunk',pts:[P('agp0'),P('pvic_a'),P('w2'),P('tanj'),P('w1'),P('pc'),P('ell'),P('sppj'),P('dw'),P('katj'),P('bbs'),P('darwin')],key:'580010-590017',w:5,trunk:true,name:'Amadeus Gas Pipeline'},
+ {id:'agp_mer',label:'',cls:'trunk',pts:[P('agp0'),P('mer')],key:'580010-590017',w:5,trunk:true,name:'Amadeus Gas Pipeline — Mereenie branch (Mereenie–Tylers Pass lateral, 116 km)'},
+ {id:'agp_pv',label:'',cls:'trunk',pts:[P('agp0'),P('pv')],key:'580010-590017',w:5,trunk:true,name:'Amadeus Gas Pipeline — Palm Valley end'},
+ {id:'kat',label:'',cls:'agp',pts:[P('katj'),P('kat')],key:'580233-590017',val:v=>v[D],name:'Katherine Lateral (part of the AGP, 5.5 km)'},
+ {id:'bgp',label:'Bonaparte Gas Pipeline',pts:[P('yel'),P('bbs')],key:'580020-590017',val:v=>v[TO],name:'Bonaparte Gas Pipeline (286 km)',along:true,valAt:[165,218]},
+ {id:'mrp',label:'McArthur River Pipeline',pts:[P('dw'),P('mrm')],key:'580100-590017',val:v=>v[TI],name:'McArthur River Pipeline (330 km)',along:true,valAt:[560,447]},
+ {id:'spp',label:'',pts:[P('spcf'),P('sppj')],key:'580237-590017',val:v=>v[TO],name:'Sturt Plateau Pipeline (37 km)'},
+ {id:'ngp',label:'Northern Gas Pipeline',pts:[P('pc'),P('mtisa')],key:'580050-590001',val:v=>v[TO],name:'Northern Gas Pipeline (622 km) — NT → QLD when the QLD row has a Transfer Out; QLD → NT when the NT row has a Transfer Out',along:true,valAt:[700,782],reverse:{key:'580050-590017',val:v=>v[TO]}},
+ {id:'cgp',label:'Carpentaria Gas Pipeline',cls:'ctx onbb',pts:[P('mtisa'),[975,862]],key:null,name:'Carpentaria Gas Pipeline',labelAt:[985,884],lanchor:'end',fsize:11,note:'Continues from Mount Isa into Queensland. Outside the NT scope of this map.'},
+ {id:'tan',label:'Tanami Gas Pipeline',pts:[P('tanj'),P('tanami')],key:'580210-590017',val:v=>v[TI],name:'Tanami Gas Pipeline (440 km) — number at the AGP junction = Transfer In from the AGP; number at the mine = Demand',along:true,valAt:[395,995],vanchor:'end'},
+ {id:'pvic',label:'PVIC',pts:[P('pvic_a'),P('pvic_b')],key:'580070-590017',name:'Palm Valley Interconnect (PVIC) — AGP → PVASP. No volume shown: the interconnect is not a GBB facility.',along:true},
+ {id:'pvasp',label:'PVASP',pts:[P('pv'),P('asj'),P('alice')],key:'580070-590017',name:'Palm Valley to Alice Springs Pipeline (PVASP, 156 km)',along:true,aoff:16,seg:[0,1]},
+ {id:'owen',label:'',pts:[P('asj'),P('owen')],key:'580235-590017',val:v=>v[D],name:'Owen Springs lateral (5.9 km)'},
+ {id:'ron',label:'',pts:[P('asj'),P('ron')],key:'580234-590017',val:v=>v[D],name:'PVASP → Ron Goodin'},
+ // Darwin inset
+ {id:'ci',label:'',pts:[P('dcg'),P('ci')],key:'580231-580001',val:v=>v[D],name:'Darwin City Gate → Channel Island (public: other-pipeline colour; private layer: AGP red)'},
+ {id:'ddn',label:'',cls:'ctx onbb',pts:[P('dcg'),P('ddn')],key:null,name:'Darwin City Gate → Darwin Distribution Network',note:'Delivery into the Darwin distribution network. Reported by AEMO as connection point 1808005; the value appears here once connection-point data is loaded.'},
+ {id:'wppagp',label:'',pts:[P('dcg'),P('weddell')],key:'580030-580001',val:v=>v[TO],cls:'lng',name:'Wickham Point Pipeline ↔ Amadeus at Darwin City Gate (LNG backfill)',reverse:{key:'580010-580001',val:v=>v[TO]}},
+ {id:'wppin',label:'Wickham Point',pts:[P('wppend'),P('weddell')],key:'580030-580001',val:v=>v[S],cls:'lng',name:'Wickham Point Pipeline (12 km)',labelAt:[848,152],fsize:9.5,label2:'Pipeline',valAt:[848,135]},
+];
+const REGIONS=[];
+
+// ---- helpers ----
+const fmt=n=>n==null?'—':(Math.abs(n)<0.05?'0':n.toFixed(1));
+function rowFor(day,key){
+  if(ACT[day]){const a=ACT[day][key]; return a?{v:a,src:'actual'}:null;}
+  const f=FC[day]&&FC[day][key]; return f?{v:f,src:'forecast'}:null;
+}
+function expected(day,key){const s=FAC[key].start; return !s||day>=s;}
+function dayMode(day){return ACT[day]?'actual':(FC[day]?'forecast':'none');}
+function width(tj){ return 4; }
+function seriesFor(key,fn){ // returns [{d,v,src}] across all dates
+  return dates.map(d=>{const r=rowFor(d,key); return {d,v:r?fn(r.v):null,src:r?r.src:null};});
+}
+const ndate=d=>{const [y,m,dd]=d.split('-');return new Date(+y,+m-1,+dd);};
+const fmtDay=d=>ndate(d).toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+
+// ---- draw ----
+const svg=document.getElementById('schematic'), gE=document.getElementById('edges'), gN=document.getElementById('nodes'), gR=document.getElementById('regions');
+const SVGNS='http://www.w3.org/2000/svg';
+const el=(t,attrs,parent)=>{const e=document.createElementNS(SVGNS,t);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e;};
+// Darwin inset frame + leader, scale bar
+el('rect',{x:INSET.x,y:INSET.y,width:INSET.w,height:INSET.h,class:'insetbox'},gR);
+el('text',{x:INSET.x+10,y:INSET.y+18,class:'region'},gR).textContent='Darwin · enlarged, not to scale';
+{const d=P('darwin'); el('line',{x1:d[0],y1:d[1],x2:INSET.x,y2:INSET.y+INSET.h/2,class:'regionline'},gR);}
+{const km=200, px=km/111*PXLAT; el('line',{x1:60,y1:1160,x2:60+px,y2:1160,class:'scalebar'},gR); el('line',{x1:60,y1:1154,x2:60,y2:1166,class:'scalebar'},gR); el('line',{x1:60+px,y1:1154,x2:60+px,y2:1166,class:'scalebar'},gR); el('text',{x:60+px/2,y:1150,class:'region','text-anchor':'middle'},gR).textContent=km+' km (straight line)';}
+const edgeEls={};
+EDGES.forEach(e=>{
+  const d='M'+e.pts.map(p=>p.join(',')).join(' L');
+  const hit=el('path',{d,class:'edge-hit'},gE);
+  const path=el('path',{d,class:'edge '+(e.cls||''),id:'e-'+e.id},gE);
+  
+  let lab=null,val=null;
+  if(e.label&&e.along){const a=e.pts[e.seg?e.seg[0]:0], b=e.pts[e.seg?e.seg[1]:e.pts.length-1]; let ang=Math.atan2(b[1]-a[1],b[0]-a[0])*180/Math.PI; if(ang>90||ang<-90) ang+=180; const dist=-(e.aoff==null?-12:e.aoff); const rad=ang*Math.PI/180; const f=e.lpos==null?0.5:e.lpos; const cx=a[0]+(b[0]-a[0])*f, cy=a[1]+(b[1]-a[1])*f; const mx=cx+Math.sin(rad)*dist, my=cy-Math.cos(rad)*dist; e.labelAt=[mx,my]; e.rot=ang; if(e.val){const vd=(e.voff==null?14:e.voff); e.valAt=[(a[0]+b[0])/2-Math.sin(rad)*vd,(a[1]+b[1])/2+Math.cos(rad)*vd]; e.vrot=ang; e.vanchor='middle';}}
+  if(e.label&&e.labelAt){const at={x:e.labelAt[0],y:e.labelAt[1],class:'elabel','text-anchor':e.lanchor||'middle'}; if(e.rot) at.transform=`rotate(${e.rot} ${e.labelAt[0]} ${e.labelAt[1]})`; if(e.fsize) at['font-size']=e.fsize; lab=el('text',at,gE);lab.textContent=e.label; if(e.label2){const t2=el('tspan',{x:e.labelAt[0],dy:'1.15em'},lab);t2.textContent=e.label2;}}
+  if(e.valAt){const va={x:e.valAt[0],y:e.valAt[1],class:'eval','text-anchor':e.vanchor||'middle',tabindex:0,role:'button'}; if(e.vrot) va.transform=`rotate(${e.vrot} ${e.valAt[0]} ${e.valAt[1]})`; val=el('text',va,gE); val.addEventListener('click',()=>select('edge',e));}
+  if(e.id==='agp'){const a=P('pc'),b=P('w1');const mx=(a[0]+b[0])/2+16,my=(a[1]+b[1])/2;const ang=Math.atan2(b[1]-a[1],b[0]-a[0])*180/Math.PI;const t=el('text',{x:mx,y:my,class:'elabel agpt','text-anchor':'middle',transform:`rotate(${ang+180} ${mx} ${my})`},gE);t.textContent='Amadeus Gas Pipeline';}
+  if(e.cls==='ctx'){path.setAttribute('marker-end','url(#arrow-ctx)');}
+  edgeEls[e.id]={path,val,hit};
+  [hit,path].forEach(h=>h.addEventListener('click',()=>select('edge',e)));
+});
+const nodeEls={};
+NODES.forEach(n=>{
+  if(n.hidden){nodeEls[n.id]={g:null,shape:null};return;}
+  const g=el('g',{class:'node '+n.kind,tabindex:0,role:'button','aria-label':n.label||(n.key?FAC[n.key].name:'')},gN);
+  let shape;
+  if(n.kind==='junction') shape=el('circle',{cx:n.x,cy:n.y,r:6,class:'shape'},g);
+  else if(n.kind==='prod') shape=el('polygon',{points:`${n.x},${n.y-12} ${n.x+11},${n.y+8} ${n.x-11},${n.y+8}`,class:'shape'},g);
+  else if(n.kind==='lng') shape=el('rect',{x:n.x-11,y:n.y-11,width:22,height:22,rx:2,class:'shape'},g);
+  else if(n.kind==='context') shape=el('rect',{x:n.x-8,y:n.y-8,width:16,height:16,rx:3,class:'shape'},g);
+  else if(n.kind==='plant') shape=el('polygon',{points:`${n.x-8},${n.y-11} ${n.x-8},${n.y+11} ${n.x+8},${n.y+7} ${n.x+8},${n.y-7}`,class:'shape'},g);
+  else shape=el('rect',{x:n.x-10,y:n.y-10,width:20,height:20,class:'shape'},g);
+  if(n.label){
+    const t=el('text',{x:n.x+(n.lx||0),y:n.y+(n.ly||0),'text-anchor':n.anchor||'middle',class:'name'},g); t.textContent=n.label;
+    if(n.sub){const s=el('text',{x:n.x+(n.lx||0),y:n.y+(n.ly||0)+14,'text-anchor':n.anchor||'middle',class:'val'},g);s.textContent=n.sub;}
+    if(n.metric!=null){const v=el('text',{x:n.x+(n.lx||0),y:n.y+(n.ly||0)+(n.sub?28:14),'text-anchor':n.anchor||'middle',class:'val'},g);nodeEls[n.id]={g,shape,v};}
+    else nodeEls[n.id]={g,shape};
+  } else nodeEls[n.id]={g,shape};
+  g.addEventListener('click',()=>select('node',n));
+  g.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();select('node',n);}});
+});
+
+// ---- state ----
+let day=lastActual, sel={type:'edge',obj:EDGES[0]};
+const slider=document.getElementById('slider'); slider.max=dates.length-1; slider.value=dates.indexOf(day);
+slider.addEventListener('input',()=>{day=dates[+slider.value];render();});
+document.getElementById('latest').addEventListener('click',()=>{day=lastActual;slider.value=dates.indexOf(day);render();});
+window.addEventListener('keydown',ev=>{if(ev.target.tagName==='INPUT')return;if(ev.key==='ArrowLeft'&&slider.value>0){slider.value--;day=dates[+slider.value];render();}if(ev.key==='ArrowRight'&&+slider.value<dates.length-1){slider.value++;day=dates[+slider.value];render();}});
+
+function select(type,obj){sel={type,obj};renderDetail();
+  document.querySelectorAll('.node.selected,.edge.selected').forEach(x=>x.classList.remove('selected'));
+  if(type==='node'&&nodeEls[obj.id].g) nodeEls[obj.id].g.classList.add('selected'); else if(type==='edge') edgeEls[obj.id].path.classList.add('selected');
+}
+
+function render(){
+  const mode=dayMode(day);
+  document.getElementById('dayLabel').textContent=fmtDay(day);
+  document.getElementById('daySub').textContent=mode==='actual'?'gas day · actual flows':'gas day · nominations & forecasts';
+  const chip=document.getElementById('dayChip'); chip.className='chip '+(mode==='actual'?'actual':'forecast'); chip.textContent=mode==='actual'?'Actual':'Forecast';
+  window.__chip=chip;
+  // edges
+  EDGES.forEach(e=>{
+    const E=edgeEls[e.id]; if(e.trunk){E.path.setAttribute('stroke-width',e.w);return;} if(e.cls==='ctx'){return;}
+    let r=rowFor(day,e.key), tj=(r&&e.val)?e.val(r.v):null, src=r?r.src:null, rev=false;
+    if(!e.val){E.path.setAttribute('stroke-width',4);E.path.removeAttribute('marker-start');E.path.setAttribute('marker-end',E.path.classList.contains('agp')?'url(#arrow-agp)':'url(#arrow)');return;}
+    if(e.reverse&&(tj==null||tj<0.05)){const r2=rowFor(day,e.reverse.key); const t2=r2?e.reverse.val(r2.v):null; if(t2!=null&&t2>=0.05){tj=t2;rev=true;src=r2.src;}}
+    E.path.setAttribute('stroke-width',width(tj));
+    E.path.classList.toggle('fc',src==='forecast');
+    E.path.style.opacity='';
+    if(e.reverse){E.path.classList.toggle('lng',!rev);}
+    const m=E.path.classList.contains('agp')?'url(#arrow-agp)':(E.path.classList.contains('lng')?'url(#arrow-lng)':'url(#arrow)');
+    if(e.reverse&&(tj==null||tj<0.05)){E.path.removeAttribute('marker-start');E.path.removeAttribute('marker-end');}
+    else if(rev){E.path.removeAttribute('marker-end');E.path.setAttribute('marker-start',m);}else{E.path.removeAttribute('marker-start');E.path.setAttribute('marker-end',m);}
+    if(E.val){E.val.textContent=tj==null?'no data':fmt(tj)+' TJ'+(e.vsuffix||'')+(rev?' ⇄':''); E.val.classList.toggle('fc',src==='forecast');}
+  });
+  // nodes
+  let reported=0,expectedN=0; const missing=[],pending=[];
+  const seen=new Set();
+  NODES.forEach(n=>{
+    const N=nodeEls[n.id]; if(!n.key||!N.g) return; const r=rowFor(day,n.key); const exp=expected(day,n.key);
+    N.g.classList.toggle('missing',!r&&exp&&mode==='actual'); N.g.classList.toggle('pending',!exp);
+    if(N.v){ N.v.textContent=!exp?'not yet reporting':(r?(fmt(n.metric===S?r.v[S]:r.v[n.metric])+' TJ '+n.mlabel).trim():(mode==='actual'?'no data reported':'no nomination')); }
+  });
+  Object.keys(FAC).forEach(k=>{
+    if(!expected(day,k)){pending.push(k);return;} expectedN++;
+    if(rowFor(day,k)&&rowFor(day,k).src===(mode==='actual'?'actual':'forecast')) reported++; else if(mode==='actual') missing.push(k);
+  });
+  // KPIs
+  const g=(k,i)=>{const r=rowFor(day,k);return r?r.v[i]:0;};
+  const prod=g('580040-590017',S)+g('580060-590017',S)+g('580180-590017',S)+g('580236-590017',S);
+  const dem=['580231-580001','580232-580001','580233-590017','580234-590017','580235-590017','580220-590017','580210-590017'].reduce((a,k)=>a+g(k,D),0);
+  const lng=g('580030-580001',TO);
+  const unit=' <span>TJ</span>';
+  document.getElementById('kProd').innerHTML=fmt(prod)+unit; document.getElementById('kDem').innerHTML=fmt(dem)+unit; 
+  if(mode==='actual'&&reported<expectedN*0.75){window.__chip.textContent='Actual · still being published';window.__chip.className='chip missing';}
+  const ks=document.getElementById('kStat'); ks.textContent=reported+' / '+expectedN; document.getElementById('kStatV').classList.toggle('bad',mode==='actual'&&reported<expectedN);
+  document.getElementById('kStatD').textContent=mode==='actual'?'facility rows received for this gas day':'nominations received for this gas day';
+  // status card
+  const sl=document.getElementById('sList'); sl.innerHTML='';
+  document.getElementById('sTitle').textContent=mode==='actual'?(missing.length?missing.length+' facilit'+(missing.length===1?'y':'ies')+' without data':'All facilities reported'):'Forecast day';
+  missing.forEach(k=>{const li=document.createElement('li');li.className='missing';li.innerHTML=`<span class="who">${FAC[k].name}</span><span class="why">${FAC[k].id} · ${FAC[k].type}</span>`;sl.appendChild(li);});
+  pending.forEach(k=>{const li=document.createElement('li');li.className='pending';li.innerHTML=`<span class="who">${FAC[k].name}</span><span class="why">reports from ${FAC[k].start}</span>`;sl.appendChild(li);});
+  document.getElementById('sNote').textContent=mode==='actual'?'A missing row means the facility operator has not submitted actuals for this gas day to AEMO. Zero flow is not missing data. In the built version these become draft follow-ups to the AEMO Support Hub.':'Nominations and forecasts are submitted by the facility operator for the next 7 days and can be revised until the gas day.';
+  renderDetail();
+}
+
+function renderDetail(){
+  const kind=document.getElementById('dKind'), name=document.getElementById('dName'), meta=document.getElementById('dMeta'), vals=document.getElementById('dVals'), sp=document.getElementById('dSpark');
+  const key=sel.obj.key;
+  if(!key){kind.textContent=sel.type==='node'?'Context · not an AEMO facility':'Pipeline · context';name.textContent=sel.type==='node'?sel.obj.label:sel.obj.name;meta.textContent='';vals.innerHTML='';sp.innerHTML='<div class="cap">'+(sel.obj.note||'')+'</div>';return;}
+  const f=FAC[key], r=rowFor(day,key);
+  kind.textContent=(sel.type==='node'?({prod:'Producer',ps:'Demand point',lng:'LNG plant',junction:'Pipeline junction',external:'Interstate delivery',context:'Context'}[sel.obj.kind]):'Pipeline');
+  name.textContent=sel.type==='node'?(sel.obj.label||f.name):sel.obj.name;
+  meta.textContent=`${f.name} · AEMO facility ${f.id} · ${f.type}${f.op?' · '+f.op:''}`;
+  const labels=['Demand','Supply','Transfer in','Transfer out'];
+  vals.innerHTML=labels.map((l,i)=>{const v=r?r.v[i]:null;return `<div><div class="l">${l}</div><div class="n ${v!=null&&v<0.05?'zero':''}">${v==null?'—':fmt(v)}</div></div>`;}).join('');
+  // sparkline of the primary metric across 31+7 days
+  const metric=sel.type==='node'?(sel.obj.metric!=null?sel.obj.metric:D):(sel.obj.trunk?S:null);
+  const fn=sel.type==='edge'&&sel.obj.val?sel.obj.val:(v=>v[metric==null?D:metric]);
+  const ser=seriesFor(key,fn); const W=420,H=110,L=34,R=8,T=10,B=24;
+  const max=Math.max(1,...ser.map(p=>p.v==null?0:p.v)); const x=i=>L+i*(W-L-R)/(ser.length-1), y=v=>T+(H-T-B)*(1-v/max);
+  let act='',fc='',dots='',miss='';
+  ser.forEach((p,i)=>{ if(p.v==null){ if(expected(p.d,key)) miss+=`<rect x="${x(i)-2.5}" y="${T}" width="5" height="${H-T-B}" fill="url(#hatch)" opacity=".7"/>`; return;}
+    const pt=`${x(i).toFixed(1)},${y(p.v).toFixed(1)}`; if(p.src==='actual') act+=(act?' L':'M')+pt; else fc+=(fc?' L':'M')+pt; });
+  // join actual end to forecast start
+  const lastA=ser.map((p,i)=>p.src==='actual'?i:-1).filter(i=>i>=0).pop(); const firstF=ser.findIndex(p=>p.src==='forecast');
+  if(lastA!=null&&firstF>=0&&ser[lastA].v!=null&&ser[firstF].v!=null) fc=`M${x(lastA).toFixed(1)},${y(ser[lastA].v).toFixed(1)} L`+fc.slice(1);
+  const di=dates.indexOf(day), dp=ser[di];
+  if(dp&&dp.v!=null) dots=`<circle cx="${x(di)}" cy="${y(dp.v)}" r="4" fill="var(--panel)" stroke="var(--flow)" stroke-width="2"/>`;
+  const ticks=[0,Math.round(ser.length/2),ser.length-1].map(i=>`<text x="${x(i)}" y="${H-6}" text-anchor="${i===0?'start':i===ser.length-1?'end':'middle'}" font-size="10" fill="var(--muted)" font-family="var(--mono)">${ser[i].d.slice(5).replace('-','/')}</text>`).join('');
+  sp.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily ${labels[metric==null?D:metric].toLowerCase()} over the last 31 days and next 7">
+    <line x1="${L}" x2="${W-R}" y1="${y(0)}" y2="${y(0)}" stroke="var(--rule)"/><line x1="${L}" x2="${W-R}" y1="${y(max)}" y2="${y(max)}" stroke="var(--rule)" stroke-dasharray="2 3"/>
+    <text x="${L-6}" y="${y(max)+4}" text-anchor="end" font-size="10" fill="var(--muted)" font-family="var(--mono)">${fmt(max)}</text><text x="${L-6}" y="${y(0)+4}" text-anchor="end" font-size="10" fill="var(--muted)" font-family="var(--mono)">0</text>
+    ${miss}<path d="${act}" fill="none" stroke="var(--flow)" stroke-width="2" stroke-linejoin="round"/><path d="${fc}" fill="none" stroke="var(--flow)" stroke-width="2" stroke-dasharray="5 4"/>${dots}
+    <line x1="${x(di)}" x2="${x(di)}" y1="${T}" y2="${H-B}" stroke="var(--rule-strong)" stroke-dasharray="2 2"/>${ticks}</svg>
+    <div class="cap">${sel.type==='edge'?'Flow on this pipeline':labels[metric==null?D:metric]}, TJ/d — solid actual, dashed forecast, hatched no data. Marker = selected day.</div>
+    <div class="hist"><table>${ser.map(p=>`<tr class="${p.src==='forecast'?'fc':''} ${p.d===day?'sel':''} ${p.v==null&&expected(p.d,key)?'miss':''}"><td>${fmtDay(p.d)}</td><td>${p.src==='forecast'?'forecast':(p.src==='actual'?'actual':'')}</td><td class="n">${p.v==null?(expected(p.d,key)?'no data':'—'):fmt(p.v)}</td></tr>`).join('')}</table></div>`;
+}
+document.getElementById('lastUpd').textContent=DATA.lastUpdated;
+render(); select('edge',EDGES[0]);
+})();
+</script>
+
+</body>
+</html>
