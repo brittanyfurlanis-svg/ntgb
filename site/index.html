@@ -465,8 +465,10 @@ function renderDetail(){
     <text x="${L-6}" y="${y(max)+4}" text-anchor="end" font-size="10" fill="var(--muted)" font-family="var(--mono)">${fmt(max)}</text><text x="${L-6}" y="${y(0)+4}" text-anchor="end" font-size="10" fill="var(--muted)" font-family="var(--mono)">0</text>
     ${miss}<path d="${act}" fill="none" stroke="var(--flow)" stroke-width="2" stroke-linejoin="round"/><path d="${fc}" fill="none" stroke="var(--flow)" stroke-width="2" stroke-dasharray="5 4"/>${dots}
     <line x1="${x(di)}" x2="${x(di)}" y1="${T}" y2="${H-B}" stroke="var(--rule-strong)" stroke-dasharray="2 2"/>${ticks}</svg>
-    <div class="cap">${sel.type==='edge'?'Flow on this pipeline':labels[metric==null?D:metric]}, TJ/d — solid actual, dashed forecast, hatched no data. Marker = selected day.</div>
+    <div class="cap">${sel.type==='edge'?'Flow on this pipeline':labels[metric==null?D:metric]}, TJ/d — solid actual, dashed forecast, hatched no data. Marker = selected day. The table below scrolls — 31 days of actuals above the selected day, 7 days of forecast below it.</div>
     <div class="hist"><table>${ser.map(p=>`<tr class="${p.src==='forecast'?'fc':''} ${p.d===day?'sel':''} ${p.v==null&&expected(p.d,key)?'miss':''}"><td>${fmtDay(p.d)}</td><td>${p.src==='forecast'?'forecast':(p.src==='actual'?'actual':'')}</td><td class="n">${p.v==null?(expected(p.d,key)?'no data':'—'):fmt(p.v)}</td></tr>`).join('')}</table></div>`;
+  // open the table on the selected day (one earlier row showing) so the actuals/forecast boundary is the first thing seen
+  const hb=sp.querySelector('.hist'), hr=hb&&hb.querySelector('tr.sel'); if(hr){const prev=hr.previousElementSibling; hb.scrollTop=(prev||hr).offsetTop;}
 }
 document.getElementById('lastUpd').textContent=DATA.lastUpdated;
 render(); select('edge',EDGES[0]);
