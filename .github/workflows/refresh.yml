@@ -1,0 +1,41 @@
+name: Refresh AEMO data
+
+on:
+  schedule:
+    # AEMO publishes actuals around midday the day after the gas day.
+    # 03:30 UTC = 13:00 ACST (first pull), 07:30 UTC = 17:00 ACST (catch late submissions).
+    - cron: "30 3 * * *"
+    - cron: "30 7 * * *"
+  workflow_dispatch:        # "Run workflow" button in GitHub = refresh on demand
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Fetch AEMO GBB files and rebuild data
+        run: python scripts/fetch_gbb.py
+
+      - name: Commit updated data
+        run: |
+          git config user.name "ntgb-bot"
+          git config user.email "ntgb-bot@users.noreply.github.com"
+          git add site/data data/history data/raw
+          if git diff --cached --quiet; then
+            echo "No data change"
+          else
+            git commit -m "data: AEMO refresh $(date -u +'%Y-%m-%d %H:%M UTC')"
+            git push
+          fi
