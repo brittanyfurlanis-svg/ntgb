@@ -77,7 +77,7 @@ header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:2
 .vals .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .vals .n{font-family:var(--display);font-weight:600;font-size:22px;font-variant-numeric:tabular-nums;line-height:1.1;margin-top:2px}
 .vals .n.zero{color:var(--muted)}
-.balance{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--rule);border:1px solid var(--rule);margin:0 0 10px}
+.balance{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--rule);border:1px solid var(--rule);margin:12px 0 10px}
 .balance div{background:var(--panel-2);padding:8px 10px}
 .balance .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .balance .eq{font-family:var(--mono);font-size:12px;margin-top:3px;color:var(--ink)}
@@ -203,7 +203,7 @@ footer{margin-top:22px;padding-top:12px;border-top:1px solid var(--rule);color:v
     <div class="legend">
       <span><i class="agpl"></i>Amadeus Gas Pipeline</span>
       <span><i></i>Other pipelines and laterals</span>
-      <span>Flow is the number beside each line, TJ per gas day · <em>italic = forecast</em></span>
+      <span>Click a pipeline for its flows and what makes them up · TJ per gas day · <em>italic = forecast</em></span>
       <span><b class="prod"></b>Producer</span>
       <span><b class="ps"></b>Power station / mine</span>
       <span><b class="junc"></b>Junction</span>
@@ -463,7 +463,7 @@ function render(){
     const m=E.path.classList.contains('agp')?'url(#arrow-agp)':(E.path.classList.contains('lng')?'url(#arrow-lng)':'url(#arrow)');
     if(e.reverse&&(tj==null||tj<0.05)){E.path.removeAttribute('marker-start');E.path.removeAttribute('marker-end');}
     else if(rev){E.path.removeAttribute('marker-end');E.path.setAttribute('marker-start',m);}else{E.path.removeAttribute('marker-start');E.path.setAttribute('marker-end',m);}
-    if(E.val){E.val.textContent=tj==null?'no data':fmt(tj)+' TJ'+(e.vsuffix||'')+(rev?' ⇄':''); E.val.classList.toggle('fc',src==='forecast');}
+    if(E.val){E.val.textContent=''; E.val.classList.remove('fc');} // pipeline numbers are not shown on the map (Britt 2026-10-02): click the line for its flows
   });
   // nodes
   let reported=0,expectedN=0; const missing=[],pending=[];
@@ -523,14 +523,15 @@ function renderDetail(){
   name.textContent=whole?'Amadeus Gas Pipeline — whole pipeline':(sel.type==='node'?(sel.obj.label||f.name):sel.obj.name);
   meta.textContent=whole?`Darwin zone (580001) + Regional NT zone (590017) summed · AEMO facility ${f.id} · ${f.type}${f.op?' · '+f.op:''}${r&&r.partial?' · only one zone has reported for this gas day':''}`:`${f.name} · AEMO facility ${f.id} · ${f.type}${f.op?' · '+f.op:''}`;
   const labels=['Demand','Supply','Transfer in','Transfer out'];
-  vals.innerHTML=labels.map((l,i)=>{const v=r?r.v[i]:null;return `<div><div class="l">${l}</div><div class="n ${v!=null&&v<0.05?'zero':''}">${v==null?'—':fmt(v)}</div></div>`;}).join('');
+  vals.innerHTML=f.type==='PIPE'?'':labels.map((l,i)=>{const v=r?r.v[i]:null;return `<div><div class="l">${l}</div><div class="n ${v!=null&&v<0.05?'zero':''}">${v==null?'—':fmt(v)}</div></div>`;}).join('');
+  vals.style.display=f.type==='PIPE'?'none':'';
   // balance and breakdown — pipelines only
   if(f.type==='PIPE'&&r){
-    const tin=r.v[S]+r.v[TI], tout=r.v[D]+r.v[TO], gap=tin-tout;
+    const tin=r.v[S]+r.v[TI], tout=r.v[D]+r.v[TO];
     bal.innerHTML=`<div class="balance">
       <div><div class="l">Into the pipeline</div><div class="eq">Supply ${fmt(r.v[S])} + Transfer in ${fmt(r.v[TI])}</div><div class="n">${fmt(tin)} <span style="font-size:12px;font-weight:500;color:var(--muted)">TJ</span></div></div>
       <div><div class="l">Out of the pipeline</div><div class="eq">Demand ${fmt(r.v[D])} + Transfer out ${fmt(r.v[TO])}</div><div class="n">${fmt(tout)} <span style="font-size:12px;font-weight:500;color:var(--muted)">TJ</span></div></div>
-      <div class="gap">Difference <b>${gap>=0?'+':'−'}${fmt(Math.abs(gap))} TJ</b>${tout>0?' ('+(Math.abs(gap)/Math.max(tin,tout)*100).toFixed(1)+' %)':''} — linepack change, compressor fuel and unaccounted-for gas; a large gap on an actual day usually means one side was reported late.</div></div>`;
+      </div>`;
     const open=exp.dataset.open==='1';
     exp.innerHTML=`<button class="btn" id="dExpBtn" aria-expanded="${open}">${open?'Hide':'Show'} what makes up each number ${open?'▾':'▸'}</button><div id="dExpBody" ${open?'':'hidden'}></div>`;
     document.getElementById('dExpBtn').addEventListener('click',()=>{exp.dataset.open=exp.dataset.open==='1'?'0':'1';renderDetail();});
@@ -555,7 +556,7 @@ function renderDetail(){
     <text x="${L-6}" y="${y(max)+4}" text-anchor="end" font-size="10" fill="var(--muted)" font-family="var(--mono)">${fmt(max)}</text><text x="${L-6}" y="${y(0)+4}" text-anchor="end" font-size="10" fill="var(--muted)" font-family="var(--mono)">0</text>
     ${miss}<path d="${act}" fill="none" stroke="var(--flow)" stroke-width="2" stroke-linejoin="round"/><path d="${fc}" fill="none" stroke="var(--flow)" stroke-width="2" stroke-dasharray="5 4"/>${dots}
     <line x1="${x(di)}" x2="${x(di)}" y1="${T}" y2="${H-B}" stroke="var(--rule-strong)" stroke-dasharray="2 2"/>${ticks}</svg>
-    <div class="cap">${sel.type==='edge'?'Flow on this pipeline':labels[metric==null?D:metric]}, TJ/d — solid actual, dashed forecast, hatched no data. Marker = selected day. The table below scrolls — 31 days of actuals above the selected day, 7 days of forecast below it.</div>
+    <div class="cap">${sel.type==='edge'&&sel.obj.val?labels[sel.obj.val([D,S,TI,TO])]+' on this pipeline':labels[metric==null?D:metric]}, TJ/d — solid actual, dashed forecast, hatched no data. Marker = selected day. The table below scrolls — 31 days of actuals above the selected day, 7 days of forecast below it.</div>
     <div class="hist"><table>${ser.map(p=>`<tr class="${p.src==='forecast'?'fc':''} ${p.d===day?'sel':''} ${p.v==null&&expected(p.d,key)?'miss':''}"><td>${fmtDay(p.d)}</td><td>${p.src==='forecast'?'forecast':(p.src==='actual'?'actual':'')}</td><td class="n">${p.v==null?(expected(p.d,key)?'no data':'—'):fmt(p.v)+(p.partial?' †':'')}</td></tr>`).join('')}</table></div>${whole?'<div class="cap">† one of the two AGP zone rows had not been published for that gas day — value is the zone that had.</div>':''}`;
   // open the table on the selected day (one earlier row showing) so the actuals/forecast boundary is the first thing seen
   const hb=sp.querySelector('.hist'), hr=hb&&hb.querySelector('tr.sel'); if(hr){const prev=hr.previousElementSibling; hb.scrollTop=(prev||hr).offsetTop;}
