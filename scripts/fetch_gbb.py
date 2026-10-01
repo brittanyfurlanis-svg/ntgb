@@ -4,6 +4,7 @@
 Runs on a schedule (GitHub Actions) or by hand:  python scripts/fetch_gbb.py
 Outputs:
   site/data/latest.json                       what the map reads: {actual, forecast, lastUpdated, fetchedAt}
+  site/data/connection.json                   connection-point flows per pipeline per gas day (last 31 days) — the "what makes up this number" breakdown
   data/history/actual/<gasday>.json           every NT actual row ever seen, one file per gas day (overwritten on revision)
   data/history/forecast/issued-<date>.json    the full 7-day forecast as published on each fetch day (B-001: forecast history)
   data/history/connection/<gasday>.json       NT connection-point flows per gas day (B-003: segment flows, stored now, drawn later)
@@ -112,6 +113,27 @@ def shape_connection(rows):
     return out
 
 
+def shape_connection_site(rows):
+    """Compact per-day connection-point flows for the site: {gasday: {facilityId: [[pointId, name, 'R'|'D', qty, locationId], ...]}}.
+    Rows for the same point/direction/zone on a day are summed. Pipelines only (that is all AEMO publishes in this file)."""
+    agg = {}
+    for r in rows:
+        try:
+            fid = int(r["FacilityId"]); pid = int(r["ConnectionPointId"]); loc = int(r["LocationId"])
+        except (KeyError, ValueError):
+            continue
+        if fid not in FACILITY_IDS:
+            continue
+        d = iso_day(r["GasDate"]); direction = "R" if r["FlowDirection"].strip().upper().startswith("REC") else "D"
+        k = (pid, direction, loc)
+        slot = agg.setdefault(d, {}).setdefault(str(fid), {})
+        if k in slot:
+            slot[k][3] = round(slot[k][3] + num(r["ActualQuantity"]), 3)
+        else:
+            slot[k] = [pid, r["ConnectionPointName"].strip(), direction, num(r["ActualQuantity"]), loc]
+    return {d: {f: sorted(pts.values(), key=lambda x: (x[2], x[1])) for f, pts in facs.items()} for d, facs in agg.items()}
+
+
 def write_json(path, obj):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
@@ -138,6 +160,7 @@ def main():
         "fetchedAt": now.strftime("%Y-%m-%d %H:%M ACST"),
     }
     write_json(os.path.join(SITE_DATA, "latest.json"), latest)
+    write_json(os.path.join(SITE_DATA, "connection.json"), {"points": shape_connection_site(connection_rows), "fetchedAt": latest["fetchedAt"]})
     save_raw(now.strftime("%Y-%m-%d"))
 
     for d, rows in actual.items():
