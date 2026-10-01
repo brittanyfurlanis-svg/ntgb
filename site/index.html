@@ -98,6 +98,8 @@ header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:2
 .breakdown .cap{margin-top:8px}
 .breakdown .none{color:var(--muted);font-style:italic;padding:2px 6px}
 .spark{margin-top:6px}
+.ctitle{font-family:var(--display);font-weight:600;font-size:15px;letter-spacing:.02em;margin:10px 0 2px}
+.ctitle span{font-family:var(--body);font-weight:400;font-size:12px;color:var(--muted);margin-left:6px}
 .spark svg{width:100%;height:auto;display:block}
 .spark .cap{font-size:12px;color:var(--muted);margin-top:4px}
 .status ul{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
@@ -365,6 +367,8 @@ function pointClass(pt){ // -> D,S,TI,TO index
   const transfer=TRANSFER_POINTS.has(pt[0]);
   return pt[2]==='R'?(transfer?TI:S):(transfer?TO:D);
 }
+const PIPE_METRIC={580010:S,580020:TO,580030:S,580050:TO,580070:TI,580100:TI,580210:TI,580237:TO};
+const PIPE_METRIC_NOTE={580010:'gas received from Mereenie and Palm Valley',580020:'gas delivered into the AGP at Ban Ban Springs',580030:'gas received at Bladin Point / Wickham Point',580050:'gas delivered out of the NGP (QLD row)',580070:'gas received from the AGP through the PVIC',580100:'gas received from the AGP at Daly Waters',580210:'gas received from the AGP at Tanami Road',580237:'gas delivered into the AGP at Sturt Plateau'};
 function keysFor(key){ // the AEMO rows that make up what the panel shows: the AGP is one pipeline published as two zone rows
   return FAC[key]&&FAC[key].id===580010?['580010-580001','580010-590017']:[key];
 }
@@ -538,8 +542,9 @@ function renderDetail(){
     if(open) document.getElementById('dExpBody').innerHTML=breakdownHTML(day,keys,r);
   } else { bal.innerHTML=''; exp.innerHTML=''; }
   // sparkline of the primary metric across 31+7 days
-  const metric=sel.type==='node'?(sel.obj.metric!=null?sel.obj.metric:D):(sel.obj.trunk?S:null);
-  const fn=sel.type==='edge'&&sel.obj.val?sel.obj.val:(v=>v[metric==null?D:metric]);
+  // what the chart and table show: one named AEMO quantity per facility (pipelines: PIPE_METRIC; nodes: the node's own metric)
+  const metric=f.type==='PIPE'?(PIPE_METRIC[f.id]!=null?PIPE_METRIC[f.id]:S):(sel.type==='node'&&sel.obj.metric!=null?sel.obj.metric:D);
+  const fn=v=>v[metric];
   const ser=seriesFor(key,fn); const W=420,H=110,L=34,R=8,T=10,B=24;
   const max=Math.max(1,...ser.map(p=>p.v==null?0:p.v)); const x=i=>L+i*(W-L-R)/(ser.length-1), y=v=>T+(H-T-B)*(1-v/max);
   let act='',fc='',dots='',miss='';
@@ -551,12 +556,12 @@ function renderDetail(){
   const di=dates.indexOf(day), dp=ser[di];
   if(dp&&dp.v!=null) dots=`<circle cx="${x(di)}" cy="${y(dp.v)}" r="4" fill="var(--panel)" stroke="var(--flow)" stroke-width="2"/>`;
   const ticks=[0,Math.round(ser.length/2),ser.length-1].map(i=>`<text x="${x(i)}" y="${H-6}" text-anchor="${i===0?'start':i===ser.length-1?'end':'middle'}" font-size="10" fill="var(--muted)" font-family="var(--mono)">${ser[i].d.slice(5).replace('-','/')}</text>`).join('');
-  sp.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily ${labels[metric==null?D:metric].toLowerCase()} over the last 31 days and next 7">
+  sp.innerHTML=`<div class="ctitle">${labels[metric]}${f.type==='PIPE'?' <span>'+(PIPE_METRIC_NOTE[f.id]||'')+'</span>':''}</div><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily ${labels[metric].toLowerCase()} over the last 31 days and next 7">
     <line x1="${L}" x2="${W-R}" y1="${y(0)}" y2="${y(0)}" stroke="var(--rule)"/><line x1="${L}" x2="${W-R}" y1="${y(max)}" y2="${y(max)}" stroke="var(--rule)" stroke-dasharray="2 3"/>
     <text x="${L-6}" y="${y(max)+4}" text-anchor="end" font-size="10" fill="var(--muted)" font-family="var(--mono)">${fmt(max)}</text><text x="${L-6}" y="${y(0)+4}" text-anchor="end" font-size="10" fill="var(--muted)" font-family="var(--mono)">0</text>
     ${miss}<path d="${act}" fill="none" stroke="var(--flow)" stroke-width="2" stroke-linejoin="round"/><path d="${fc}" fill="none" stroke="var(--flow)" stroke-width="2" stroke-dasharray="5 4"/>${dots}
     <line x1="${x(di)}" x2="${x(di)}" y1="${T}" y2="${H-B}" stroke="var(--rule-strong)" stroke-dasharray="2 2"/>${ticks}</svg>
-    <div class="cap">${sel.type==='edge'&&sel.obj.val?labels[sel.obj.val([D,S,TI,TO])]+' on this pipeline':labels[metric==null?D:metric]}, TJ/d — solid actual, dashed forecast, hatched no data. Marker = selected day. The table below scrolls — 31 days of actuals above the selected day, 7 days of forecast below it.</div>
+    <div class="cap">TJ per gas day — solid actual, dashed forecast, hatched no data. Marker = selected day. The table below scrolls — 31 days of actuals above the selected day, 7 days of forecast below it.</div>
     <div class="hist"><table>${ser.map(p=>`<tr class="${p.src==='forecast'?'fc':''} ${p.d===day?'sel':''} ${p.v==null&&expected(p.d,key)?'miss':''}"><td>${fmtDay(p.d)}</td><td>${p.src==='forecast'?'forecast':(p.src==='actual'?'actual':'')}</td><td class="n">${p.v==null?(expected(p.d,key)?'no data':'—'):fmt(p.v)+(p.partial?' †':'')}</td></tr>`).join('')}</table></div>${whole?'<div class="cap">† one of the two AGP zone rows had not been published for that gas day — value is the zone that had.</div>':''}`;
   // open the table on the selected day (one earlier row showing) so the actuals/forecast boundary is the first thing seen
   const hb=sp.querySelector('.hist'), hr=hb&&hb.querySelector('tr.sel'); if(hr){const prev=hr.previousElementSibling; hb.scrollTop=(prev||hr).offsetTop;}
