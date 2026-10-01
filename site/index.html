@@ -188,8 +188,8 @@ footer{margin-top:22px;padding-top:12px;border-top:1px solid var(--rule);color:v
 </div>
 
 <section class="kpis" aria-label="Territory totals for the selected gas day">
-  <div class="kpi"><div class="eyebrow">NT production</div><div class="v"><span id="kProd">—</span></div><div class="d">Blacktip (Yelcherr) + Mereenie + Palm Valley + SPCF</div></div>
-  <div class="kpi"><div class="eyebrow">NT demand</div><div class="v"><span id="kDem">—</span></div><div class="d">Channel Island PS + Weddell PS + Katherine PS + Ron Goodin PS + Owen Springs PS + McArthur River Mine + Tanami Gold Mine</div></div>
+  <div class="kpi"><div class="eyebrow">NT production</div><div class="v"><span id="kProd">—</span></div><div class="d">Supply reported by the producers: Yelcherr GP (Blacktip) + Mereenie + Palm Valley + SPCF<span id="kProdChk"></span></div></div>
+  <div class="kpi"><div class="eyebrow">NT demand</div><div class="v"><span id="kDem">—</span></div><div class="d">Gas delivered to end users off every NT pipeline: Demand on the Amadeus (both zones) + Bonaparte + Wickham Point + Northern (NT) + Palm Valley–Alice Springs + McArthur River + Tanami + Sturt Plateau rows<span id="kDemChk"></span></div></div>
   <div class="kpi status"><div class="eyebrow">Facilities reported</div><div class="v" id="kStatV"><span id="kStat">—</span></div><div class="d" id="kStatD">of facilities expected to report</div></div>
 </section>
 
@@ -486,10 +486,16 @@ function render(){
   // KPIs
   const g=(k,i)=>{const r=rowFor(day,k);return r?r.v[i]:0;};
   const prod=g('580040-590017',S)+g('580060-590017',S)+g('580180-590017',S)+g('580236-590017',S);
-  const dem=['580231-580001','580232-580001','580233-590017','580234-590017','580235-590017','580220-590017','580210-590017'].reduce((a,k)=>a+g(k,D),0);
+  // NT demand = Demand on every NT pipeline row (end-user deliveries; transfers between pipelines excluded; NGP Queensland row excluded). Agreed with Britt 2026-10-03.
+  const DEM_KEYS=['580010-580001','580010-590017','580020-590017','580030-580001','580050-590017','580070-590017','580100-590017','580210-590017','580237-590017'];
+  const dem=DEM_KEYS.reduce((a,k)=>a+g(k,D),0);
+  // two-way check against the connection-point file: production vs pipeline receipts from producers; demand vs end-user delivery points
+  let chkD='',chkP=''; if(CONN&&CONN[day]){ const pts=[]; DEM_KEYS.forEach(k=>(CONN[day][String(FAC[k].id)]||[]).forEach(p=>{ if(+k.split('-')[1]===p[4]) pts.push(p); }));
+    const dPts=pts.filter(p=>pointClass(p)===D), dSum=dPts.reduce((a,p)=>a+p[3],0); chkD=Math.abs(dSum-dem)<0.0105?` · ✓ equals ${dPts.length} delivery points`:` · ✗ delivery points sum to ${fmt(dSum)}`;
+    const PROD_PTS={1808010:'580040-590017',1808012:'580060-590017',1808018:'580180-590017',1808076:'580236-590017'}; let pSum=0; pts.length; Object.values(CONN[day]).flat().forEach(p=>{ if(PROD_PTS[p[0]]&&p[2]==='R') pSum+=p[3]; }); chkP=` · pipelines received ${fmt(pSum)} from these producers`; }
   const lng=g('580030-580001',TO);
   const unit=' <span>TJ</span>';
-  document.getElementById('kProd').innerHTML=fmt(prod)+unit; document.getElementById('kDem').innerHTML=fmt(dem)+unit; 
+  document.getElementById('kProd').innerHTML=fmt(prod)+unit; document.getElementById('kDem').innerHTML=fmt(dem)+unit; document.getElementById('kDemChk').textContent=chkD; document.getElementById('kProdChk').textContent=chkP; 
   if(mode==='actual'&&reported<expectedN*0.75){window.__chip.textContent='Actual · still being published';window.__chip.className='chip missing';}
   const ks=document.getElementById('kStat'); ks.textContent=reported+' / '+expectedN; document.getElementById('kStatV').classList.toggle('bad',mode==='actual'&&reported<expectedN);
   document.getElementById('kStatD').textContent=mode==='actual'?'facility rows received for this gas day':'nominations received for this gas day';
