@@ -81,7 +81,9 @@ header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:2
 .balance div{background:var(--panel-2);padding:8px 10px}
 .balance .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .balance .eq{font-family:var(--mono);font-size:12px;margin-top:6px;color:var(--muted)}
-.balance .n{font-family:var(--display);font-weight:600;font-size:20px;font-variant-numeric:tabular-nums;line-height:1.1;margin-top:2px}
+.balance .hd{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.balance .n{font-family:var(--display);font-weight:600;font-size:20px;font-variant-numeric:tabular-nums;line-height:1.1}
+.balance .u{font-size:12px;font-weight:500;color:var(--muted)}
 .balance .gap{grid-column:1/3;font-size:12px;color:var(--muted)}
 .balance .gap b{color:var(--ink);font-family:var(--mono);font-weight:500}
 .btn{font:inherit;font-size:12.5px;color:var(--flow);background:none;border:1px solid var(--rule-strong);padding:5px 10px;cursor:pointer;border-radius:2px}
@@ -533,8 +535,8 @@ function renderDetail(){
   if(f.type==='PIPE'&&r){
     const tin=r.v[S]+r.v[TI], tout=r.v[D]+r.v[TO];
     bal.innerHTML=`<div class="balance">
-      <div><div class="l">Into the pipeline</div><div class="n">${fmt(tin)} <span style="font-size:12px;font-weight:500;color:var(--muted)">TJ</span></div><div class="eq">Supply ${fmt(r.v[S])} + Transfer in ${fmt(r.v[TI])}</div></div>
-      <div><div class="l">Out of the pipeline</div><div class="n">${fmt(tout)} <span style="font-size:12px;font-weight:500;color:var(--muted)">TJ</span></div><div class="eq">Demand ${fmt(r.v[D])} + Transfer out ${fmt(r.v[TO])}</div></div>
+      <div><div class="hd"><span class="l">Into the pipeline</span><span class="n">${fmt(tin)} <span class="u">TJ</span></span></div><div class="eq">Supply ${fmt(r.v[S])} + Transfer in ${fmt(r.v[TI])}</div></div>
+      <div><div class="hd"><span class="l">Out of the pipeline</span><span class="n">${fmt(tout)} <span class="u">TJ</span></span></div><div class="eq">Demand ${fmt(r.v[D])} + Transfer out ${fmt(r.v[TO])}</div></div>
       </div>`;
     const open=exp.dataset.open==='1';
     exp.innerHTML=`<button class="btn" id="dExpBtn" aria-expanded="${open}">${open?'Hide':'Show'} what makes up each number ${open?'▾':'▸'}</button><div id="dExpBody" ${open?'':'hidden'}></div>`;
