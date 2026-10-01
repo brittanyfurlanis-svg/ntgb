@@ -77,6 +77,26 @@ header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:2
 .vals .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .vals .n{font-family:var(--display);font-weight:600;font-size:22px;font-variant-numeric:tabular-nums;line-height:1.1;margin-top:2px}
 .vals .n.zero{color:var(--muted)}
+.balance{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--rule);border:1px solid var(--rule);margin:0 0 10px}
+.balance div{background:var(--panel-2);padding:8px 10px}
+.balance .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.balance .eq{font-family:var(--mono);font-size:12px;margin-top:3px;color:var(--ink)}
+.balance .n{font-family:var(--display);font-weight:600;font-size:20px;font-variant-numeric:tabular-nums;line-height:1.1;margin-top:2px}
+.balance .gap{grid-column:1/3;font-size:12px;color:var(--muted)}
+.balance .gap b{color:var(--ink);font-family:var(--mono);font-weight:500}
+.btn{font:inherit;font-size:12.5px;color:var(--flow);background:none;border:1px solid var(--rule-strong);padding:5px 10px;cursor:pointer;border-radius:2px}
+.btn:hover{border-color:var(--flow)}
+.btn[aria-expanded="true"]{background:var(--flow-soft)}
+.breakdown{margin:10px 0 4px;font-size:12.5px}
+.breakdown h4{font-family:var(--display);font-weight:600;font-size:14px;margin:12px 0 4px;letter-spacing:.02em}
+.breakdown h4 .sum{font-family:var(--mono);font-weight:500;font-size:12px;color:var(--muted);margin-left:8px}
+.breakdown h4 .ok{color:#188038}.breakdown h4 .bad{color:var(--missing)}
+.breakdown table{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:11.5px}
+.breakdown td{padding:2px 6px;border-bottom:1px solid var(--rule);vertical-align:top}
+.breakdown td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.breakdown td.z{color:var(--muted);white-space:nowrap}
+.breakdown .cap{margin-top:8px}
+.breakdown .none{color:var(--muted);font-style:italic;padding:2px 6px}
 .spark{margin-top:6px}
 .spark svg{width:100%;height:auto;display:block}
 .spark .cap{font-size:12px;color:var(--muted);margin-top:4px}
@@ -198,6 +218,8 @@ footer{margin-top:22px;padding-top:12px;border-top:1px solid var(--rule);color:v
       <h2 id="dName">Amadeus Gas Pipeline</h2>
       <div class="meta" id="dMeta"></div>
       <div class="vals" id="dVals"></div>
+      <div id="dBal"></div>
+      <div id="dExp"></div>
       <div class="spark" id="dSpark"></div>
     </div>
     <div class="card status" id="statusCard">
@@ -221,6 +243,8 @@ let DATA;
 try{const resp=await fetch('data/latest.json?v='+Date.now(),{cache:'no-store'}); if(!resp.ok) throw new Error(resp.status); DATA=await resp.json();}
 catch(err){document.getElementById('dayLabel').textContent='Data unavailable'; document.getElementById('daySub').textContent='could not load data/latest.json — '+err; return;}
 const ACT=DATA.actual, FC=DATA.forecast;
+let CONN=null; // connection-point flows per pipeline per gas day (actual days only)
+try{const rc=await fetch('data/connection.json?v='+Date.now(),{cache:'no-store'}); if(rc.ok){const j=await rc.json(); CONN=j.points||null;}}catch(e){CONN=null;}
 const dates=[...new Set([...Object.keys(ACT),...Object.keys(FC)])].sort();
 let lastActual=null; // set after FAC is defined: latest gas day with >=75% of expected facilities reporting
 
@@ -324,10 +348,41 @@ function rowFor(day,key){
   const f=FC[day]&&FC[day][key]; return f?{v:f,src:'forecast'}:null;
 }
 function expected(day,key){const s=FAC[key].start; return !s||day>=s;}
+// Connection points that join another Bulletin Board pipeline (AEMO BB Aggregation Methodology v1.2: flows at transfer points are Transfers; other receipts are Supply, other deliveries are Demand).
+const TRANSFER_POINTS=new Set([
+  1808000,1808073,1808078,1808017,   // AGP receipts: Ban Ban Springs (BGP), NGP Entry, Sturt Plateau Entry (SPP), Darwin City Gate Entry WPP DS (WPP)
+  1808004,1808006,1808011,1808013,1808048, // AGP deliveries: Daly Waters (MRP), Darwin City Gate to WPP, NGP, Palm Valley Interconnect (PVASP), Tanami Road (Tanami GP)
+  1808021,1808022,                   // WPP: Darwin City Gate Entry / Exit (AGP)
+  1808020,                           // BGP: Ban Ban Springs Delivery (AGP)
+  1808026,                           // MRP: Daly Waters (AGP)
+  1808028,1808074,1490098,1404296,   // NGP: Phillip Creek, Tennant Creek (AGP end), Mt Isa receipt/delivery (Carpentaria GP end) — unverified until the NGP flows
+  1808030,                           // PVP: Palm Valley Interconnect (AGP)
+  1808047,                           // Tanami GP: Amadeus receipt (AGP)
+  1808077                            // SPP: AGP Delivery Stream (AGP)
+]);
+const UNVERIFIED_POINTS=new Set([1808028,1808074,1490098,1404296]);
+function pointClass(pt){ // -> D,S,TI,TO index
+  const transfer=TRANSFER_POINTS.has(pt[0]);
+  return pt[2]==='R'?(transfer?TI:S):(transfer?TO:D);
+}
+function keysFor(key){ // the AEMO rows that make up what the panel shows: the AGP is one pipeline published as two zone rows
+  return FAC[key]&&FAC[key].id===580010?['580010-580001','580010-590017']:[key];
+}
+function aggFor(day,keys){ // sum of rows for one gas day; n = rows found
+  let v=null,src=null,n=0;
+  keys.forEach(k=>{const r=rowFor(day,k); if(!r) return; n++; src=src||r.src; v=v?v.map((x,i)=>x+r.v[i]):r.v.slice();});
+  return v?{v:v.map(x=>Math.round(x*1000)/1000),src,n,partial:n<keys.length}:null;
+}
+function pointsFor(day,keys){ // connection-point rows for these facility rows on an actual day, tagged with zone
+  if(!CONN||!CONN[day]) return null; const out=[]; const fids=[...new Set(keys.map(k=>String(FAC[k].id)))];
+  fids.forEach(f=>(CONN[day][f]||[]).forEach(pt=>{ if(keys.some(k=>+k.split('-')[1]===pt[4])) out.push(pt); }));
+  return out;
+}
 function dayMode(day){return ACT[day]?'actual':(FC[day]?'forecast':'none');}
 function width(tj){ return 4; }
-function seriesFor(key,fn){ // returns [{d,v,src}] across all dates
-  return dates.map(d=>{const r=rowFor(d,key); return {d,v:r?fn(r.v):null,src:r?r.src:null};});
+function seriesFor(key,fn){ // returns [{d,v,src,partial}] across all dates; the AGP sums its two zone rows
+  const keys=keysFor(key);
+  return dates.map(d=>{const r=aggFor(d,keys); return {d,v:r?fn(r.v):null,src:r?r.src:null,partial:!!(r&&r.partial)};});
 }
 const ndate=d=>{const [y,m,dd]=d.split('-');return new Date(+y,+m-1,+dd);};
 const fmtDay=d=>ndate(d).toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
@@ -441,16 +496,46 @@ function render(){
   renderDetail();
 }
 
+function breakdownHTML(day,keys,r){
+  const labels=['Demand','Supply','Transfer in','Transfer out'];
+  const zoneName=loc=>({580001:'Darwin',590017:'Regional NT',590001:'Regional QLD'}[loc]||loc);
+  const pts=pointsFor(day,keys);
+  const src=`<div class="cap">Source: AEMO Gas Board — Pipeline Connection Flow (last 31 days), gas day ${fmtDay(day)}. Each point is classified per AEMO's BB Aggregation Methodology v1.2: receipts from producers or LNG plants = Supply; receipts from another Bulletin Board pipeline = Transfer in; deliveries to end users (power stations, mines, towns, distribution, LNG export) = Demand; deliveries to another Bulletin Board pipeline = Transfer out. ✓ = the points add to the published figure within 0.01 TJ.</div>`;
+  if(dayMode(day)!=='actual') return `<div class="none">AEMO publishes connection-point flows for actual gas days only — choose an actual day to see the make-up.</div>`;
+  if(!pts) return `<div class="none">Connection-point data for this gas day has not been fetched yet (it arrives with the next refresh).</div>`+src;
+  let h='';
+  [D,S,TI,TO].forEach(c=>{
+    const rows=pts.filter(p=>pointClass(p)===c).sort((a,b)=>b[3]-a[3]||a[1].localeCompare(b[1]));
+    const sum=Math.round(rows.reduce((a,p)=>a+p[3],0)*1000)/1000, pub=r.v[c], ok=Math.abs(sum-pub)<0.0105;
+    h+=`<h4>${labels[c]} <span class="sum">= ${sum.toFixed(3)} TJ from ${rows.length} point${rows.length===1?'':'s'} · published ${pub.toFixed(3)} ${ok?'<span class="ok">✓</span>':'<span class="bad">✗ differs by '+(sum-pub).toFixed(3)+'</span>'}</span></h4>`;
+    h+=rows.length?`<table>${rows.map(p=>`<tr><td>${p[1]}${UNVERIFIED_POINTS.has(p[0])?' *':''}</td><td class="z">${keys.length>1?zoneName(p[4]):''}</td><td class="n">${p[3].toFixed(3)}</td></tr>`).join('')}</table>`:`<div class="none">no ${labels[c].toLowerCase()} points on this pipeline</div>`;
+  });
+  if(pts.some(p=>UNVERIFIED_POINTS.has(p[0]))) h+=`<div class="cap">* Northern Gas Pipeline points are classified as transfers from their names; the NGP has not flowed since this site began storing data, so this is unverified.</div>`;
+  return h+src;
+}
 function renderDetail(){
   const kind=document.getElementById('dKind'), name=document.getElementById('dName'), meta=document.getElementById('dMeta'), vals=document.getElementById('dVals'), sp=document.getElementById('dSpark');
   const key=sel.obj.key;
   if(!key){kind.textContent=sel.type==='node'?'Context · not an AEMO facility':'Pipeline · context';name.textContent=sel.type==='node'?sel.obj.label:sel.obj.name;meta.textContent='';vals.innerHTML='';sp.innerHTML='<div class="cap">'+(sel.obj.note||'')+'</div>';return;}
-  const f=FAC[key], r=rowFor(day,key);
+  const f=FAC[key], keys=keysFor(key), whole=keys.length>1, r=aggFor(day,keys);
+  const bal=document.getElementById('dBal'), exp=document.getElementById('dExp');
   kind.textContent=(sel.type==='node'?({prod:'Producer',ps:'Demand point',lng:'LNG plant',junction:'Pipeline junction',external:'Interstate delivery',context:'Context'}[sel.obj.kind]):'Pipeline');
-  name.textContent=sel.type==='node'?(sel.obj.label||f.name):sel.obj.name;
-  meta.textContent=`${f.name} · AEMO facility ${f.id} · ${f.type}${f.op?' · '+f.op:''}`;
+  name.textContent=whole?'Amadeus Gas Pipeline — whole pipeline':(sel.type==='node'?(sel.obj.label||f.name):sel.obj.name);
+  meta.textContent=whole?`Darwin zone (580001) + Regional NT zone (590017) summed · AEMO facility ${f.id} · ${f.type}${f.op?' · '+f.op:''}${r&&r.partial?' · only one zone has reported for this gas day':''}`:`${f.name} · AEMO facility ${f.id} · ${f.type}${f.op?' · '+f.op:''}`;
   const labels=['Demand','Supply','Transfer in','Transfer out'];
   vals.innerHTML=labels.map((l,i)=>{const v=r?r.v[i]:null;return `<div><div class="l">${l}</div><div class="n ${v!=null&&v<0.05?'zero':''}">${v==null?'—':fmt(v)}</div></div>`;}).join('');
+  // balance and breakdown — pipelines only
+  if(f.type==='PIPE'&&r){
+    const tin=r.v[S]+r.v[TI], tout=r.v[D]+r.v[TO], gap=tin-tout;
+    bal.innerHTML=`<div class="balance">
+      <div><div class="l">Into the pipeline</div><div class="eq">Supply ${fmt(r.v[S])} + Transfer in ${fmt(r.v[TI])}</div><div class="n">${fmt(tin)} <span style="font-size:12px;font-weight:500;color:var(--muted)">TJ</span></div></div>
+      <div><div class="l">Out of the pipeline</div><div class="eq">Demand ${fmt(r.v[D])} + Transfer out ${fmt(r.v[TO])}</div><div class="n">${fmt(tout)} <span style="font-size:12px;font-weight:500;color:var(--muted)">TJ</span></div></div>
+      <div class="gap">Difference <b>${gap>=0?'+':'−'}${fmt(Math.abs(gap))} TJ</b>${tout>0?' ('+(Math.abs(gap)/Math.max(tin,tout)*100).toFixed(1)+' %)':''} — linepack change, compressor fuel and unaccounted-for gas; a large gap on an actual day usually means one side was reported late.</div></div>`;
+    const open=exp.dataset.open==='1';
+    exp.innerHTML=`<button class="btn" id="dExpBtn" aria-expanded="${open}">${open?'Hide':'Show'} what makes up each number ${open?'▾':'▸'}</button><div id="dExpBody" ${open?'':'hidden'}></div>`;
+    document.getElementById('dExpBtn').addEventListener('click',()=>{exp.dataset.open=exp.dataset.open==='1'?'0':'1';renderDetail();});
+    if(open) document.getElementById('dExpBody').innerHTML=breakdownHTML(day,keys,r);
+  } else { bal.innerHTML=''; exp.innerHTML=''; }
   // sparkline of the primary metric across 31+7 days
   const metric=sel.type==='node'?(sel.obj.metric!=null?sel.obj.metric:D):(sel.obj.trunk?S:null);
   const fn=sel.type==='edge'&&sel.obj.val?sel.obj.val:(v=>v[metric==null?D:metric]);
@@ -471,7 +556,7 @@ function renderDetail(){
     ${miss}<path d="${act}" fill="none" stroke="var(--flow)" stroke-width="2" stroke-linejoin="round"/><path d="${fc}" fill="none" stroke="var(--flow)" stroke-width="2" stroke-dasharray="5 4"/>${dots}
     <line x1="${x(di)}" x2="${x(di)}" y1="${T}" y2="${H-B}" stroke="var(--rule-strong)" stroke-dasharray="2 2"/>${ticks}</svg>
     <div class="cap">${sel.type==='edge'?'Flow on this pipeline':labels[metric==null?D:metric]}, TJ/d — solid actual, dashed forecast, hatched no data. Marker = selected day. The table below scrolls — 31 days of actuals above the selected day, 7 days of forecast below it.</div>
-    <div class="hist"><table>${ser.map(p=>`<tr class="${p.src==='forecast'?'fc':''} ${p.d===day?'sel':''} ${p.v==null&&expected(p.d,key)?'miss':''}"><td>${fmtDay(p.d)}</td><td>${p.src==='forecast'?'forecast':(p.src==='actual'?'actual':'')}</td><td class="n">${p.v==null?(expected(p.d,key)?'no data':'—'):fmt(p.v)}</td></tr>`).join('')}</table></div>`;
+    <div class="hist"><table>${ser.map(p=>`<tr class="${p.src==='forecast'?'fc':''} ${p.d===day?'sel':''} ${p.v==null&&expected(p.d,key)?'miss':''}"><td>${fmtDay(p.d)}</td><td>${p.src==='forecast'?'forecast':(p.src==='actual'?'actual':'')}</td><td class="n">${p.v==null?(expected(p.d,key)?'no data':'—'):fmt(p.v)+(p.partial?' †':'')}</td></tr>`).join('')}</table></div>${whole?'<div class="cap">† one of the two AGP zone rows had not been published for that gas day — value is the zone that had.</div>':''}`;
   // open the table on the selected day (one earlier row showing) so the actuals/forecast boundary is the first thing seen
   const hb=sp.querySelector('.hist'), hr=hb&&hb.querySelector('tr.sel'); if(hr){const prev=hr.previousElementSibling; hb.scrollTop=(prev||hr).offsetTop;}
 }
