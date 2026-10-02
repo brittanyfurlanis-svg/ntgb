@@ -193,7 +193,7 @@ footer{margin-top:22px;padding-top:12px;border-top:1px solid var(--rule);color:v
 
 <section class="kpis" aria-label="Territory totals for the selected gas day">
   <div class="kpi"><div class="eyebrow">NT production</div><div class="v"><span id="kProd">—</span></div><div class="d">Supply reported by each NT producer to AEMO, TJ:<div class="dl" id="kProdList"></div><span id="kProdChk"></span></div></div>
-  <div class="kpi"><div class="eyebrow">NT demand</div><div class="v"><span id="kDem">—</span></div><div class="d">Gas delivered to each NT end user, TJ (AEMO Pipeline Connection Flow delivery points; on forecast days the pipeline Demand rows are shown instead):<div class="dl" id="kDemList"></div><span id="kDemChk"></span></div></div>
+  <div class="kpi"><div class="eyebrow">NT demand</div><div class="v"><span id="kDem">—</span></div><div class="d">Gas delivered to each NT end user, TJ — named by its GasBB facility name where the user reports in its own right, otherwise by the AEMO delivery point (on forecast days AEMO publishes no delivery points, so the pipeline Demand rows are listed instead):<div class="dl" id="kDemList"></div><span id="kDemChk"></span></div></div>
   <div class="kpi status"><div class="eyebrow">Facilities reported</div><div class="v" id="kStatV"><span id="kStat">—</span></div><div class="d" id="kStatD">of facilities expected to report</div></div>
 </section>
 
@@ -498,10 +498,12 @@ function render(){
   const dem=DEM_KEYS.reduce((a,k)=>a+g(k,D),0);
   const DEM_NAMES={'580010-580001':'Amadeus Gas Pipeline — Darwin zone','580010-590017':'Amadeus Gas Pipeline — Regional NT','580020-590017':'Bonaparte Gas Pipeline','580030-580001':'Wickham Point Pipeline','580050-590017':'Northern Gas Pipeline — NT row','580070-590017':'Palm Valley to Alice Springs Pipeline','580100-590017':'McArthur River Pipeline','580210-590017':'Tanami Gas Pipeline','580237-590017':'Sturt Plateau Pipeline'};
   const PIPE_SHORT={580010:'Amadeus GP',580020:'Bonaparte GP',580030:'Wickham Point P',580050:'Northern GP',580070:'PVASP',580100:'McArthur River P',580210:'Tanami GP',580237:'Sturt Plateau P'};
+  // Who the gas goes to: where the delivery point serves a facility that reports to the GasBB in its own right, show that facility's GasBB name; otherwise the AEMO delivery point name is the user.
+  const USER_AT_POINT={1808001:'Channel Island Power Station',1808002:'Channel Island Power Station',1808003:'Channel Island Power Station',1808023:'Weddell Power Station',1808008:'Katherine Power Station',1808009:'Katherine Power Station',1808049:'Ron Goodin Power Station',1808059:'Owen Springs Power Station',1808069:'McArthur River Mine',1808061:'Tanami Gold Mine',1808071:'Tanami Gold Mine'};
   // The list under the tile names every end user (AEMO connection point) on actual days; on forecast days AEMO publishes no points, so the pipeline Demand rows are listed instead.
-  let demPts=null; if(CONN&&CONN[day]){ demPts=[]; DEM_KEYS.forEach(k=>(CONN[day][String(FAC[k].id)]||[]).forEach(p=>{ if(+k.split('-')[1]===p[4]&&pointClass(p)===D) demPts.push({name:p[1],pipe:PIPE_SHORT[FAC[k].id]||FAC[k].id,qty:p[3]}); })); }
+  let demPts=null; if(CONN&&CONN[day]){ demPts=[]; DEM_KEYS.forEach(k=>(CONN[day][String(FAC[k].id)]||[]).forEach(p=>{ if(+k.split('-')[1]===p[4]&&pointClass(p)===D) demPts.push({name:USER_AT_POINT[p[0]]||p[1],pt:USER_AT_POINT[p[0]]?p[1]:'',pipe:PIPE_SHORT[FAC[k].id]||FAC[k].id,qty:p[3]}); })); }
   const demList=document.getElementById('kDemList');
-  if(demPts){ const ptSum=demPts.reduce((a,p)=>a+p.qty,0); demList.innerHTML=demPts.map(p=>`<span>${p.name} <i>${p.pipe}</i></span><b>${fmt(p.qty)}</b>`).join('')+`<span class="tot">NT demand (${demPts.length} end-user delivery points)</span><b class="tot">${fmt(ptSum)}</b>`; }
+  if(demPts){ const ptSum=demPts.reduce((a,p)=>a+p.qty,0); demList.innerHTML=demPts.map(p=>`<span>${p.name} <i>${p.pt?p.pt+' · ':''}${p.pipe}</i></span><b>${fmt(p.qty)}</b>`).join('')+`<span class="tot">NT demand (${demPts.length} end-user delivery points)</span><b class="tot">${fmt(ptSum)}</b>`; }
   else { demList.innerHTML=DEM_KEYS.map(k=>{const r=rowFor(day,k); return `<span>${DEM_NAMES[k]} <i>${FAC[k].id}</i></span><b>${r?fmt(r.v[D]):'no data'}</b>`;}).join('')+`<span class="tot">NT demand</span><b class="tot">${fmt(dem)}</b>`; }
   // two-way check against the connection-point file: production vs pipeline receipts from producers; demand vs end-user delivery points
   let chkD='',chkP=''; if(CONN&&CONN[day]){ const pts=[]; DEM_KEYS.forEach(k=>(CONN[day][String(FAC[k].id)]||[]).forEach(p=>{ if(+k.split('-')[1]===p[4]) pts.push(p); }));
