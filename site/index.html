@@ -47,6 +47,8 @@ header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:2
 .chip.missing{color:var(--missing);border-color:var(--missing);background:var(--missing-soft)}
 .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--rule);border:1px solid var(--rule);margin-bottom:16px}
 .kpi{background:var(--panel);padding:14px 16px}
+.kbtn{display:block;font:inherit;font-size:11.5px;color:var(--flow);background:none;border:0;padding:4px 0 0;cursor:pointer;text-align:left}
+.kbtn:hover{text-decoration:underline}
 .kpi .dl{display:grid;grid-template-columns:1fr auto;gap:1px 10px;margin:6px 0 4px;font-size:11.5px;line-height:1.35}
 .kpi .dl i{font-style:normal;font-family:var(--mono);color:var(--muted);font-size:10.5px;margin-left:4px}
 .kpi .dl b{font-family:var(--mono);font-weight:500;text-align:right;font-variant-numeric:tabular-nums}
@@ -192,8 +194,8 @@ footer{margin-top:22px;padding-top:12px;border-top:1px solid var(--rule);color:v
 </div>
 
 <section class="kpis" aria-label="Territory totals for the selected gas day">
-  <div class="kpi"><div class="eyebrow">NT production</div><div class="v"><span id="kProd">—</span></div><div class="d">Supply reported by each NT producer to AEMO, TJ:<div class="dl" id="kProdList"></div><span id="kProdChk"></span></div></div>
-  <div class="kpi"><div class="eyebrow">NT demand</div><div class="v"><span id="kDem">—</span></div><div class="d">Gas delivered to each NT end user, TJ — named by its GasBB facility name where the user reports in its own right, otherwise by the AEMO delivery point (on forecast days AEMO publishes no delivery points, so the pipeline Demand rows are listed instead):<div class="dl" id="kDemList"></div><span id="kDemChk"></span></div></div>
+  <div class="kpi"><div class="eyebrow">NT production</div><div class="v"><span id="kProd">—</span></div><div class="d">Supply reported by each NT producer, plus gas supplied into the NT from the Ichthys LNG plant<button class="kbtn" data-for="kProdCalc" aria-expanded="false">Show the calculation ▸</button><div id="kProdCalc" hidden>TJ, as published by AEMO:<div class="dl" id="kProdList"></div><span id="kProdChk"></span></div></div></div>
+  <div class="kpi"><div class="eyebrow">NT demand</div><div class="v"><span id="kDem">—</span></div><div class="d">Gas delivered to every NT end user<button class="kbtn" data-for="kDemCalc" aria-expanded="false">Show the calculation ▸</button><div id="kDemCalc" hidden>TJ, as published by AEMO — each user named by its GasBB facility name where it reports in its own right, otherwise by the AEMO delivery point (on forecast days AEMO publishes no delivery points, so the pipeline Demand rows are listed instead):<div class="dl" id="kDemList"></div><span id="kDemChk"></span></div></div></div>
   <div class="kpi status"><div class="eyebrow">Facilities reported</div><div class="v" id="kStatV"><span id="kStat">—</span></div><div class="d" id="kStatD">of facilities expected to report</div></div>
 </section>
 
@@ -489,10 +491,11 @@ function render(){
   });
   // KPIs
   const g=(k,i)=>{const r=rowFor(day,k);return r?r.v[i]:0;};
-  const PROD_KEYS=['580180-590017','580040-590017','580060-590017','580236-590017'];
-  const PROD_NAMES={'580180-590017':'Yelcherr Gas Plant (Blacktip)','580040-590017':'Mereenie','580060-590017':'Palm Valley','580236-590017':'Sturt Plateau Central Facility (SPCF)'};
+  // NT production = Supply reported by each NT producer + gas supplied into the NT from the Ichthys LNG plant (WPP Supply = Bladin Point / Wickham Point entry). Agreed with Britt 2026-10-05.
+  const PROD_KEYS=['580180-590017','580040-590017','580060-590017','580236-590017','580030-580001'];
+  const PROD_NAMES={'580180-590017':'Yelcherr Gas Plant (Blacktip)','580040-590017':'Mereenie','580060-590017':'Palm Valley','580236-590017':'Sturt Plateau Central Facility (SPCF)','580030-580001':'INPEX Ichthys LNG — gas into the Wickham Point Pipeline'};
   const prod=PROD_KEYS.reduce((a,k)=>a+g(k,S),0);
-  document.getElementById('kProdList').innerHTML=PROD_KEYS.map(k=>{const r=rowFor(day,k); return `<span>${PROD_NAMES[k]} <i>${FAC[k].id}</i></span><b>${r?fmt(r.v[S]):'no data'}</b>`;}).join('')+`<span class="tot">NT production</span><b class="tot">${fmt(prod)}</b>`;
+  document.getElementById('kProdList').innerHTML=PROD_KEYS.map(k=>{const r=rowFor(day,k); return `<span>${PROD_NAMES[k]} <i>${k==='580030-580001'?'WPP Supply · '+FAC[k].id:FAC[k].id}</i></span><b>${r?fmt(r.v[S]):'no data'}</b>`;}).join('')+`<span class="tot">NT production</span><b class="tot">${fmt(prod)}</b>`;
   // NT demand = Demand on every NT pipeline row (end-user deliveries; transfers between pipelines excluded; NGP Queensland row excluded). Agreed with Britt 2026-10-03.
   const DEM_KEYS=['580010-580001','580010-590017','580020-590017','580030-580001','580050-590017','580070-590017','580100-590017','580210-590017','580237-590017'];
   const dem=DEM_KEYS.reduce((a,k)=>a+g(k,D),0);
@@ -591,6 +594,7 @@ function renderDetail(){
   const hb=sp.querySelector('.hist'), hr=hb&&hb.querySelector('tr.sel'); if(hr){const prev=hr.previousElementSibling; hb.scrollTop=(prev||hr).offsetTop;}
 }
 document.getElementById('lastUpd').textContent=DATA.lastUpdated;
+document.querySelectorAll('.kbtn').forEach(b=>b.addEventListener('click',()=>{const t=document.getElementById(b.dataset.for); const open=t.hidden; t.hidden=!open; b.setAttribute('aria-expanded',open); b.textContent=(open?'Hide the calculation ▾':'Show the calculation ▸');}));
 render(); select('edge',EDGES[0]);
 })();
 </script>
