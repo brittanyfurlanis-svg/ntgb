@@ -523,7 +523,7 @@ function render(){
   document.getElementById('sTitle').textContent=mode==='actual'?(missing.length?missing.length+' facilit'+(missing.length===1?'y':'ies')+' without data':'All facilities reported'):'Forecast day';
   missing.forEach(k=>{const li=document.createElement('li');li.className='missing';li.innerHTML=`<span class="who">${FAC[k].name}</span><span class="why">${FAC[k].id} · ${FAC[k].type}</span>`;sl.appendChild(li);});
   pending.forEach(k=>{const li=document.createElement('li');li.className='pending';li.innerHTML=`<span class="who">${FAC[k].name}</span><span class="why">reports from ${FAC[k].start}</span>`;sl.appendChild(li);});
-  document.getElementById('sNote').textContent=mode==='actual'?'A missing row means the facility operator has not submitted actuals for this gas day to AEMO. Zero flow is not missing data. In the built version these become draft follow-ups to the AEMO Support Hub.':'Nominations and forecasts are submitted by the facility operator for the next 7 days and can be revised until the gas day.';
+  document.getElementById('sNote').textContent=mode==='actual'?'A missing row means the facility operator has not submitted actuals for this gas day to AEMO. Zero flow is not missing data.':'Nominations and forecasts are submitted by the facility operator for the next 7 days and can be revised until the gas day.';
   renderDetail();
 }
 
