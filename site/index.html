@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="NT Gas Board — daily gas flows across the Northern Territory: production, demand and pipeline transfers for NT facilities reporting to AEMO.">
 <title>NTGB · NT Gas Flows</title>
+<!-- Privacy-friendly analytics: GoatCounter — no cookies, no personal data. Page views are counted automatically; the map's own actions are sent as events by track() below. -->
+<script data-goatcounter="https://ntgb.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 <link rel="icon" href="favicon.ico" sizes="48x48">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
@@ -242,7 +244,7 @@ footer{margin-top:22px;padding-top:12px;border-top:1px solid var(--rule);color:v
 </div>
 
 <footer>
-  <span>Source: AEMO Gas Board (GBB) — Actual Flow &amp; Storage (last 31 days) and Nominations &amp; Forecasts (next 7 days), © AEMO, reproduced with acknowledgement. Last AEMO update <span id="lastUpd" style="font-family:var(--mono)"></span>; refreshed daily. NTGB is independent and not affiliated with AEMO or the Northern Territory Government.</span>
+  <span>Source: AEMO Gas Board (GBB) — Actual Flow &amp; Storage (last 31 days) and Nominations &amp; Forecasts (next 7 days), © AEMO, reproduced with acknowledgement. Last AEMO update <span id="lastUpd" style="font-family:var(--mono)"></span>; refreshed daily. NTGB is independent and not affiliated with AEMO or the Northern Territory Government. Visits are counted with privacy-friendly analytics (GoatCounter): no cookies, no personal data.</span>
   <span>Facility IDs are AEMO's. Main map positioned by approximate site coordinates (1° latitude ≈ 111 km); Darwin enlarged; short laterals drawn longer than life so they can be read.</span>
 </footer>
 </div>
@@ -448,10 +450,15 @@ NODES.forEach(n=>{
 let day=lastActual, sel={type:'edge',obj:EDGES[0]};
 const slider=document.getElementById('slider'); slider.max=dates.length-1; slider.value=dates.indexOf(day);
 slider.addEventListener('input',()=>{day=dates[+slider.value];render();});
+slider.addEventListener('change',()=>{track('day/'+(dayMode(day)==='forecast'?'forecast':(day===lastActual?'latest':'history')),'Gas day moved');});
 document.getElementById('latest').addEventListener('click',()=>{day=lastActual;slider.value=dates.indexOf(day);render();});
 window.addEventListener('keydown',ev=>{if(ev.target.tagName==='INPUT')return;if(ev.key==='ArrowLeft'&&slider.value>0){slider.value--;day=dates[+slider.value];render();}if(ev.key==='ArrowRight'&&+slider.value<dates.length-1){slider.value++;day=dates[+slider.value];render();}});
 
+// analytics events (GoatCounter): what people look at, never who they are
+function track(path,title){try{if(window.goatcounter&&window.goatcounter.count) window.goatcounter.count({path:path,title:title||path,event:true});}catch(e){}}
+let booted=false; // the page auto-selects the AGP on load; that is not a visitor action
 function select(type,obj){sel={type,obj};renderDetail();
+  if(booted&&obj.key&&FAC[obj.key]){const nm=FAC[obj.key].id===580010?'Amadeus Gas Pipeline':FAC[obj.key].name; track((FAC[obj.key].type==='PIPE'?'select/pipeline/':'select/facility/')+nm.replace(/[^A-Za-z0-9]+/g,'-').replace(/-+$/,''),nm);}
   document.querySelectorAll('.node.selected,.edge.selected').forEach(x=>x.classList.remove('selected'));
   if(type==='node'&&nodeEls[obj.id].g) nodeEls[obj.id].g.classList.add('selected'); else if(type==='edge') edgeEls[obj.id].path.classList.add('selected');
 }
@@ -565,7 +572,7 @@ function renderDetail(){
       </div>`;
     const open=exp.dataset.open==='1';
     exp.innerHTML=`<button class="btn" id="dExpBtn" aria-expanded="${open}">${open?'Hide':'Show'} what makes up each number ${open?'▾':'▸'}</button><div id="dExpBody" ${open?'':'hidden'}></div>`;
-    document.getElementById('dExpBtn').addEventListener('click',()=>{exp.dataset.open=exp.dataset.open==='1'?'0':'1';renderDetail();});
+    document.getElementById('dExpBtn').addEventListener('click',()=>{exp.dataset.open=exp.dataset.open==='1'?'0':'1'; if(exp.dataset.open==='1'){const nm=f.id===580010?'Amadeus Gas Pipeline':f.name; track('breakdown/'+nm.replace(/[^A-Za-z0-9]+/g,'-').replace(/-+$/,''),'Make-up opened: '+nm);} renderDetail();});
     if(open) document.getElementById('dExpBody').innerHTML=breakdownHTML(day,keys,r);
   } else { bal.innerHTML=''; exp.innerHTML=''; }
   // sparkline of the primary metric across 31+7 days
@@ -594,8 +601,8 @@ function renderDetail(){
   const hb=sp.querySelector('.hist'), hr=hb&&hb.querySelector('tr.sel'); if(hr){const prev=hr.previousElementSibling; hb.scrollTop=(prev||hr).offsetTop;}
 }
 document.getElementById('lastUpd').textContent=DATA.lastUpdated;
-document.querySelectorAll('.kbtn').forEach(b=>b.addEventListener('click',()=>{const t=document.getElementById(b.dataset.for); const open=t.hidden; t.hidden=!open; b.setAttribute('aria-expanded',open); b.textContent=(open?'Hide the calculation ▾':'Show the calculation ▸');}));
-render(); select('edge',EDGES[0]);
+document.querySelectorAll('.kbtn').forEach(b=>b.addEventListener('click',()=>{const t=document.getElementById(b.dataset.for); const open=t.hidden; if(open) track('calc/'+(b.dataset.for==='kProdCalc'?'production':'demand'),'Calculation opened'); t.hidden=!open; b.setAttribute('aria-expanded',open); b.textContent=(open?'Hide the calculation ▾':'Show the calculation ▸');}));
+render(); select('edge',EDGES[0]); booted=true;
 })();
 </script>
 
